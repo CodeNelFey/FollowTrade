@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ... le reste de ton CSS ... */
+
+@layer utilities {
+    .animation-delay-2000 {
+        animation-delay: 2s;
+    }
+    .animation-delay-4000 {
+        animation-delay: 4s;
+    }
+}
+
+/* index.css */
+
+/* ... ton code existant ... */
+
+@layer utilities {
+    .animation-delay-2000 { animation-delay: 2s; }
+    .animation-delay-4000 { animation-delay: 4s; }
+}
+
+/* 1. Animation des Blobs de couleur (Flottement) */
+@keyframes blob {
+    0% { transform: translate(0px, 0px) scale(1); }
+    33% { transform: translate(30px, -50px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
+    100% { transform: translate(0px, 0px) scale(1); }
+}
+.animate-blob {
+    animation: blob 10s infinite;
+}
+
+/* 2. Animation de la Grille (Effet de vol vers l'avant) */
+@keyframes grid-flow {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 80px; } /* Doit correspondre à la taille de la grille */
+}
+.animate-grid-flow {
+    animation: grid-flow 1s linear infinite; /* Vitesse du vol */
+}
+
+/* 3. Scintillement des étoiles */
+@keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+.animate-twinkle {
+    animation: twinkle 3s ease-in-out infinite;
+}
+
+/* 4. Flottement vertical lent (Bougies/Lignes) */
+@keyframes float-candle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+.animate-float-candle {
+    animation: float-candle 6s ease-in-out infinite;
+}

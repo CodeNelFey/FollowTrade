@@ -1,0 +1,41 @@
+# --- Dépendances (Trop lourd) ---
+node_modules/
+server/node_modules/
+
+# --- Build de production (Généré automatiquement) ---
+dist/
+dist-ssr/
+build/
+
+# --- Base de données (IMPORTANT) ---
+# Empêche d'écraser tes données locales ou de les envoyer sur GitHub
+*.db
+*.sqlite
+*.sqlite3
+server/journal.db
+server/journal.db-journal
+
+# --- Fichiers d'environnement (Sécurité) ---
+# Contient souvent des mots de passe ou clés API
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Logs et Debug ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Fichiers Système (Inutiles) ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Fichiers temporaires Vim/Emacs ---
+*~
+*.swp
+*.swo
