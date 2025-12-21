@@ -15,7 +15,7 @@ import AdminPanel from './components/AdminPanel';
 import Auth from './components/Auth';
 import Home from './components/Home';
 
-// Nouveaux composants extraits
+// Composants d'interface (les fameux composants dédiés)
 import UpgradeModal from './components/UpgradeModal';
 import AlertPopup from './components/AlertPopup';
 import NotificationModal from './components/NotificationModal';
@@ -118,7 +118,7 @@ function App() {
     const closeSystemAlert = async (id) => {
         setSystemAlert(null);
         await api.markSingleNotificationRead(id);
-        loadNotifications(); // Refresh counters
+        loadNotifications();
     };
 
     const openNotifModal = async () => {
@@ -183,17 +183,18 @@ function App() {
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-100'}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
     return (
-        <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'}`}>
+        /* STRUCTURE MOBILE FIXE : h-[100dvh] + flex-col */
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
             <TradingBackground />
 
-            {/* --- MODALS & POPUPS --- */}
+            {/* --- POPUPS & MODALS --- */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
 
-            <div className="relative z-10 flex h-screen overflow-hidden">
+            <div className="relative z-10 flex flex-1 h-full overflow-hidden">
 
-                {/* --- SIDEBAR DESKTOP --- */}
+                {/* --- SIDEBAR (Desktop seulement) --- */}
                 <Sidebar
                     user={user}
                     activeTab={activeTab}
@@ -204,11 +205,11 @@ function App() {
                     onOpenNotif={openNotifModal}
                 />
 
-                {/* --- CONTENU PRINCIPAL --- */}
+                {/* --- ZONE CONTENU (Droite) --- */}
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* Header Mobile */}
-                    <header className="h-16 md:hidden bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4">
+                    {/* Header Mobile (Hauteur fixe, ne bouge pas) */}
+                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-lg dark:text-white">FollowTrade</span>
                             <button onClick={openNotifModal} className="relative p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300">
@@ -222,10 +223,9 @@ function App() {
                         </div>
                     </header>
 
+                    {/* Contenu Scrollable (Prend toute la place disponible au milieu) */}
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8">
-                        <main className="max-w-7xl mx-auto">
-
-                            {/* --- CONTENU DES ONGLETS --- */}
+                        <main className="max-w-7xl mx-auto pb-6"> {/* pb-6 pour aérer le bas */}
 
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
@@ -241,13 +241,17 @@ function App() {
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user.default_risk} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
-                            {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} /></div>}
+
+                            {/* Passation de la fonction de déconnexion */}
+                            {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} /></div>}
 
                         </main>
                     </div>
 
-                    {/* --- MENU MOBILE --- */}
-                    <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} />
+                    {/* Menu Mobile (Hauteur fixe, collé en bas) */}
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
+                        <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} />
+                    </div>
                 </div>
             </div>
         </div>

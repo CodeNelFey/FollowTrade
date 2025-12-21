@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Lock, Mail, Save, AlertTriangle, Sliders, Palette, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera } from 'lucide-react';
+import { User, Lock, Mail, Save, AlertTriangle, Sliders, Palette, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut } from 'lucide-react'; // Added LogOut icon
 import { api } from '../api';
 
 const CURRENCIES = [
@@ -8,7 +8,7 @@ const CURRENCIES = [
     { code: 'GBP', name: 'British Pound', icon: PoundSterling },
 ];
 
-const SettingsView = ({ user, onUpdateUser, onClose }) => {
+const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added onLogout prop
     const [formData, setFormData] = useState({
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
@@ -407,13 +407,27 @@ const SettingsView = ({ user, onUpdateUser, onClose }) => {
                     </div>
                 </div>
 
-                <div className="flex justify-end mb-10">
+                {/* BOUTON ENREGISTRER */}
+                <div className="mb-10 md:flex md:justify-end">
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
+                        // J'ai ajouté 'w-full' (largeur max mobile) et 'md:w-auto' (taille normale PC)
+                        // J'ai aussi ajouté 'justify-center' pour centrer le texte sur mobile
+                        className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
                     >
                         {isLoading ? 'Sauvegarde...' : <><Save size={18} /> Enregistrer les modifications</>}
+                    </button>
+                </div>
+
+                {/* --- BOUTON DE DECONNEXION --- */}
+                <div className="pt-6 mt-6 border-t border-gray-200 dark:border-neutral-800">
+                    <button
+                        type="button"
+                        onClick={onLogout}
+                        className="w-full py-4 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold rounded-2xl border border-red-100 dark:border-red-900/30 active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-red-100 dark:hover:bg-red-900/20"
+                    >
+                        <LogOut size={20} /> Se déconnecter
                     </button>
                 </div>
 
