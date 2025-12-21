@@ -2,27 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ... le reste de ton CSS ... */
-
-@layer utilities {
-    .animation-delay-2000 {
-        animation-delay: 2s;
-    }
-    .animation-delay-4000 {
-        animation-delay: 4s;
-    }
-}
-
-/* index.css */
-
-/* ... ton code existant ... */
-
+/* --- UTILITAIRES --- */
 @layer utilities {
     .animation-delay-2000 { animation-delay: 2s; }
     .animation-delay-4000 { animation-delay: 4s; }
 }
 
-/* 1. Animation des Blobs de couleur (Flottement) */
+/* --- ANIMATIONS (TradingBackground) --- */
+/* 1. Animation des Blobs */
 @keyframes blob {
     0% { transform: translate(0px, 0px) scale(1); }
     33% { transform: translate(30px, -50px) scale(1.1); }
@@ -33,16 +20,16 @@
     animation: blob 10s infinite;
 }
 
-/* 2. Animation de la Grille (Effet de vol vers l'avant) */
+/* 2. Animation de la Grille */
 @keyframes grid-flow {
     0% { background-position: 0 0; }
-    100% { background-position: 0 80px; } /* Doit correspondre à la taille de la grille */
+    100% { background-position: 0 80px; }
 }
 .animate-grid-flow {
-    animation: grid-flow 1s linear infinite; /* Vitesse du vol */
+    animation: grid-flow 1s linear infinite;
 }
 
-/* 3. Scintillement des étoiles */
+/* 3. Scintillement */
 @keyframes twinkle {
     0%, 100% { opacity: 0.2; transform: scale(0.8); }
     50% { opacity: 1; transform: scale(1.2); }
@@ -51,7 +38,7 @@
     animation: twinkle 3s ease-in-out infinite;
 }
 
-/* 4. Flottement vertical lent (Bougies/Lignes) */
+/* 4. Flottement vertical */
 @keyframes float-candle {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-20px); }
@@ -60,31 +47,43 @@
     animation: float-candle 6s ease-in-out infinite;
 }
 
+/* --- CONFIGURATION GLOBALE & SAFE AREA --- */
+
 :root {
-    /* Définit la couleur de fond de base (noir ou gris très foncé selon votre thème) */
-    --bg-color: #000000;
+    --app-bg: #000000;       /* Noir pour l'application */
+    --status-bar-bg: #262626; /* Gris pour la barre du haut */
 }
 
-html, body {
+/* C'EST ICI QUE LA MAGIE OPÈRE */
+
+html {
+    /* 1. On met le gris sur HTML. C'est ce qu'on verra à travers la barre transparente */
+    background-color: var(--status-bar-bg);
+
+    width: 100%;
+    height: 100%;
+    overscroll-behavior: none; /* Empêche le rebond */
+}
+
+body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
 
-    /* 1. Applique la couleur sombre au fond du navigateur lui-même */
-    background-color: var(--bg-color);
+    /* 2. On remet le noir sur BODY pour le contenu de l'app */
+    background-color: var(--app-bg);
 
-    /* 2. Empêche le rebond élastique (le scroll "blanc") */
     overscroll-behavior: none;
-
-    /* 3. Assure que le texte est lisible si le CSS met du temps à charger */
     color: white;
 }
 
 #root {
     height: 100%;
     width: 100%;
-    background-color: var(--bg-color);
-    /* Empêche le débordement horizontal */
+
+    /* 3. Le conteneur React est aussi en noir */
+    background-color: var(--app-bg);
+
     overflow-x: hidden;
 }
