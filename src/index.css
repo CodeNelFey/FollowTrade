@@ -37,32 +37,21 @@
 
 /* --- CONFIGURATION IOS & COULEURS --- */
 :root {
-    --app-bg: #000000;
-    --status-bar-bg: #262626;
+    --bg-color: #000000;
 }
 
-html {
-    /* C'est ce GRIS qu'on verra à travers la barre d'état transparente */
-    background-color: var(--status-bar-bg);
-    width: 100%;
-    height: 100%;
-    overscroll-behavior: none;
-}
-
-body {
+html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
-    /* L'application elle-même reste noire */
-    background-color: var(--app-bg);
-    overscroll-behavior: none;
-    color: white;
+    background-color: var(--bg-color); /* Tout noir */
+    overscroll-behavior: none; /* Bloque le rebond blanc */
 }
 
 #root {
     height: 100%;
     width: 100%;
-    background-color: var(--app-bg);
+    background-color: var(--bg-color);
     overflow-x: hidden;
 }

@@ -171,10 +171,10 @@ function App() {
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-100'}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
     return (
-        /* HACK IOS : pt-[env(safe-area-inset-top)] pour que le contenu commence SOUS la barre d'état */
-        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col pt-[env(safe-area-inset-top)]`}>
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
             <TradingBackground />
 
+            {/* ... Modals ... */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
@@ -193,7 +193,16 @@ function App() {
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
+                    {/* --- HEADER MOBILE MODIFIÉ --- */}
+                    {/* J'applique votre couleur #262626 et je le rends "relative" pour l'extension */}
+                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20 relative">
+
+                        {/* L'EXTENSION MAGIQUE (500px vers le haut) */}
+                        {/* bottom-full = collé au dessus du header */}
+                        {/* pointer-events-none = on ne peut pas cliquer dessus */}
+                        <div className="absolute bottom-full left-0 right-0 h-[500px] bg-white/80 dark:bg-[#262626] pointer-events-none"></div>
+
+                        {/* Le contenu normal du header */}
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-lg dark:text-white">FollowTrade</span>
                             <button onClick={openNotifModal} className="relative p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300">
@@ -208,6 +217,7 @@ function App() {
                     </header>
 
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8">
+                        {/* ... Le reste du contenu main ... */}
                         <main className="max-w-7xl mx-auto pb-6">
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
