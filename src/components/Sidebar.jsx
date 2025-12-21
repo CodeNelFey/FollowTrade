@@ -3,6 +3,10 @@ import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calcul
 
 const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadNotifsCount, onOpenNotif }) => {
 
+    // --- 1. LOGIQUE D'IMAGE AUTOMATIQUE ---
+    // Permet d'afficher l'avatar correctement en Local ET en Prod
+    const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+
     // BADGES PREMIUM
     const getBadge = () => {
         if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>;
@@ -18,7 +22,12 @@ const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadN
             <div className="flex justify-between items-start mb-8 px-2">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/30 bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                        {user.avatar_url ? <img src={`http://localhost:3000${user.avatar_url}`} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-white font-bold">FT</span>}
+                        {/* 2. UTILISATION DE BASE_URL ICI */}
+                        {user.avatar_url ? (
+                            <img src={`${BASE_URL}${user.avatar_url}`} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-white font-bold">FT</span>
+                        )}
                     </div>
                     <div className="min-w-0">
                         <h1 className="font-black text-lg text-gray-900 dark:text-white truncate">{user.first_name || 'User'}</h1>

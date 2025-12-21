@@ -38,7 +38,11 @@ const AdminPanel = () => {
         setLoading(true); setError(null);
         try {
             const data = await api.adminGetAllUsers();
-            if (Array.isArray(data)) { setUsers(data); setFilteredUsers(data); }
+            if (Array.isArray(data)) {
+                // Le backend envoie maintenant des URLs complètes (https://...), on les utilise directement
+                setUsers(data);
+                setFilteredUsers(data);
+            }
         } catch (error) { setError("Erreur chargement users"); } finally { setLoading(false); }
     };
 
@@ -54,9 +58,10 @@ const AdminPanel = () => {
         e.preventDefault();
         try {
             await api.adminUpdateUser(editingUser.id, formData);
-            setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData } : u));
+            // On recharge les utilisateurs pour avoir les URLs à jour
+            loadUsers();
             setEditingUser(null);
-        } catch (e) { alert("Erreur"); }
+        } catch (e) { alert("Erreur lors de la sauvegarde"); }
     };
 
     const handleDeleteUser = async (id) => {
@@ -120,13 +125,17 @@ const AdminPanel = () => {
                         <input type="text" placeholder="Rechercher un utilisateur..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white dark:bg-neutral-900/50 pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-neutral-700 focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 dark:text-white transition-all backdrop-blur-sm" />
                     </div>
 
-                    {/* VUE MOBILE : CARTES (Nouveau bloc) */}
+                    {/* VUE MOBILE : CARTES */}
                     <div className="md:hidden space-y-4">
                         {filteredUsers.map(u => (
                             <div key={u.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-5 rounded-2xl border border-white/20 shadow-sm">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
-                                        {u.avatar_url ? <img src={`http://localhost:3000${u.avatar_url}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={20}/></div>}
+                                        {u.avatar_url ? (
+                                            <img src={u.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={20}/></div>
+                                        )}
                                     </div>
                                     <div>
                                         <div className="font-bold text-gray-900 dark:text-white">{u.first_name} {u.last_name}</div>
@@ -136,17 +145,11 @@ const AdminPanel = () => {
                                 <div className="flex items-center justify-between border-t border-gray-100 dark:border-white/5 pt-4">
                                     {renderBadge(u.is_pro)}
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleEditUserClick(u)}
-                                            className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-bold flex items-center gap-2"
-                                        >
+                                        <button onClick={() => handleEditUserClick(u)} className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-bold flex items-center gap-2">
                                             <Edit2 size={14} /> Modifier
                                         </button>
                                         {u.is_pro !== 7 && (
-                                            <button
-                                                onClick={() => handleDeleteUser(u.id)}
-                                                className="p-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-lg"
-                                            >
+                                            <button onClick={() => handleDeleteUser(u.id)} className="p-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-lg">
                                                 <Trash2 size={16} />
                                             </button>
                                         )}
@@ -156,7 +159,7 @@ const AdminPanel = () => {
                         ))}
                     </div>
 
-                    {/* VUE BUREAU : TABLEAU (Caché sur mobile) */}
+                    {/* VUE BUREAU : TABLEAU */}
                     <div className="hidden md:block bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl rounded-3xl shadow-xl border border-white/40 dark:border-white/5 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -167,7 +170,13 @@ const AdminPanel = () => {
                                 {filteredUsers.map(u => (
                                     <tr key={u.id} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">{u.avatar_url ? <img src={`http://localhost:3000${u.avatar_url}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={14}/></div>}</div>
+                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
+                                                {u.avatar_url ? (
+                                                    <img src={u.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={14}/></div>
+                                                )}
+                                            </div>
                                             <span className="font-bold text-gray-900 dark:text-white">{u.first_name} {u.last_name}</span>
                                         </td>
                                         <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">{u.email}</td>
@@ -205,7 +214,7 @@ const AdminPanel = () => {
                 </>
             )}
 
-            {/* --- MODALE MODIFICATION UTILISATEUR --- */}
+            {/* --- MODALE MODIFICATION UTILISATEUR (Responsive) --- */}
             {editingUser && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
                     <div className="bg-white dark:bg-neutral-900 w-full max-w-lg rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
@@ -216,7 +225,13 @@ const AdminPanel = () => {
                         <form onSubmit={handleSaveUser} className="p-6 overflow-y-auto">
                             <div className="flex flex-col items-center mb-8">
                                 <div className="relative group">
-                                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-neutral-800 shadow-xl bg-gray-100 dark:bg-neutral-700 mb-3">{formData.avatar_url ? <img src={`http://localhost:3000${formData.avatar_url}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={40} /></div>}</div>
+                                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-neutral-800 shadow-xl bg-gray-100 dark:bg-neutral-700 mb-3">
+                                        {formData.avatar_url ? (
+                                            <img src={formData.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={40} /></div>
+                                        )}
+                                    </div>
                                     {formData.avatar_url && <button type="button" onClick={() => setFormData({ ...formData, avatar_url: '' })} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-md hover:scale-110"><Trash2 size={12} /></button>}
                                 </div>
                                 <h4 className="text-xl font-black text-gray-900 dark:text-white">{formData.first_name} {formData.last_name}</h4>

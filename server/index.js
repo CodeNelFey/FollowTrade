@@ -27,6 +27,19 @@ const storage = multer.diskStorage({
     }
 });
 
+const getProfilePhotoUrl = (avatarPath) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith('http')) return avatarPath; // Déjà complet (ex: Google Auth)
+
+    // DÉTECTION DE L'ENVIRONNEMENT
+    // Si on est en production (sur le serveur), on utilise le vrai domaine HTTPS
+    const DOMAIN = process.env.NODE_ENV === 'production'
+        ? 'https://followtrade.sohan-birotheau.fr'
+        : 'http://localhost:3000';
+
+    return `${DOMAIN}${avatarPath}`;
+};
+
 const upload = multer({
     storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 },
@@ -195,6 +208,18 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows);
     });
+});
+
+app.get('/api/admin/users', (req, res) => {
+    const users = db.prepare('SELECT * FROM users').all();
+
+    // On nettoie les URLs avant d'envoyer
+    const usersWithSecureUrls = users.map(u => ({
+        ...u,
+        avatar_url: getProfilePhotoUrl(u.avatar_url)
+    }));
+
+    res.json(usersWithSecureUrls);
 });
 
 app.put('/api/admin/users/:id', authenticateToken, requireAdmin, (req, res) => {

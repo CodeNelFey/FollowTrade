@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-// AJOUT DE ShieldAlert DANS LES IMPORTS
 import { User, Lock, Mail, Save, AlertTriangle, Sliders, Palette, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut, ShieldAlert } from 'lucide-react';
 import { api } from '../api';
 
@@ -9,8 +8,10 @@ const CURRENCIES = [
     { code: 'GBP', name: 'British Pound', icon: PoundSterling },
 ];
 
-// AJOUT DE LA PROP 'onNavigate' ICI
 const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
+    // --- 1. LOGIQUE D'IMAGE AUTOMATIQUE ---
+    const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+
     const [formData, setFormData] = useState({
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
@@ -23,7 +24,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         currency: user?.preferences?.currency || 'USD',
     });
 
-    // Gestion de l'avatar
     const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
     const fileInputRef = useRef(null);
 
@@ -48,7 +48,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         }
     }, [user]);
 
-    // Fermer le menu si on clique ailleurs
     useEffect(() => {
         function handleClickOutside(event) {
             if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(event.target)) {
@@ -72,21 +71,19 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         setIsCurrencyOpen(false);
     };
 
-    // Gestion du changement de fichier (Avatar)
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Prévisualisation locale immédiate
+        // Prévisualisation locale immédiate (blob)
         const objectUrl = URL.createObjectURL(file);
         setAvatarUrl(objectUrl);
 
         try {
-            // Upload immédiat
             const res = await api.uploadAvatar(file);
             if (res.avatar_url) {
                 const updatedUser = { ...user, avatar_url: res.avatar_url };
-                api.setUser(updatedUser); // Stockage local
+                api.setUser(updatedUser);
                 if (onUpdateUser) onUpdateUser(updatedUser);
                 setMessage({ type: 'success', text: "Photo de profil mise à jour !" });
             }
@@ -135,15 +132,22 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
     const currentCurrency = CURRENCIES.find(c => c.code === formData.currency) || CURRENCIES[0];
     const CurrencyIcon = currentCurrency.icon;
 
-    // Construction de l'URL de l'image
-    const displayAvatar = avatarUrl
-        ? (avatarUrl.startsWith('blob:') ? avatarUrl : `http://localhost:3000${avatarUrl}`)
-        : null;
+    // --- 2. CONSTRUCTION INTELLIGENTE DE L'URL ---
+    let displayAvatar = null;
+    if (avatarUrl) {
+        if (avatarUrl.startsWith('blob:') || avatarUrl.startsWith('http')) {
+            // Si c'est une preview locale ou déjà une URL complète (envoyée par le backend corrigé)
+            displayAvatar = avatarUrl;
+        } else {
+            // Sinon on ajoute le préfixe (Localhost ou Vide pour Prod)
+            displayAvatar = `${BASE_URL}${avatarUrl}`;
+        }
+    }
 
     return (
         <div className="max-w-4xl mx-auto pb-20">
 
-            {/* HEADER AVEC BOUTON RETOUR */}
+            {/* HEADER */}
             <div className="flex items-center gap-4 mb-8">
                 <button
                     onClick={onClose}
@@ -171,7 +175,7 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
                 </div>
             )}
 
-            {/* --- ZONE ADMIN (VISIBLE UNIQUEMENT SI ADMIN) --- */}
+            {/* --- ZONE ADMIN --- */}
             {user?.is_pro === 7 && (
                 <div className="mb-8 animate-in fade-in slide-in-from-top-4">
                     <button
@@ -311,7 +315,7 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
                     </div>
                 </div>
 
-                {/* --- SECTION 3 : TRADING (Z-INDEX 20) --- */}
+                {/* --- SECTION 3 : TRADING --- */}
                 <div className={`${sectionClass} relative z-20`}>
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
                         <Sliders size={18} className="text-indigo-500" />
@@ -383,7 +387,7 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
                     </div>
                 </div>
 
-                {/* --- SECTION 4 : INTERFACE (Z-INDEX 10) --- */}
+                {/* --- SECTION 4 : INTERFACE --- */}
                 <div className={`${sectionClass} relative z-10`}>
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
                         <Palette size={18} className="text-indigo-500" />
