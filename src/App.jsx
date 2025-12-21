@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Wallet, Plus, Settings, Bell } from 'lucide-react';
 import { api } from './api';
 
-// --- IMPORTS COMPOSANTS ---
+// --- IMPORTS ---
 import TradingBackground from './components/TradingBackground';
 import TradeForm from './components/TradeForm';
 import TradeHistory from './components/TradeHistory';
@@ -15,7 +15,6 @@ import AdminPanel from './components/AdminPanel';
 import Auth from './components/Auth';
 import Home from './components/Home';
 
-// Composants d'interface (les fameux composants dédiés)
 import UpgradeModal from './components/UpgradeModal';
 import AlertPopup from './components/AlertPopup';
 import NotificationModal from './components/NotificationModal';
@@ -23,31 +22,26 @@ import Sidebar from './components/Sidebar';
 import MobileMenu from './components/MobileMenu';
 
 function App() {
-    // --- ÉTATS ---
     const [user, setUser] = useState(null);
     const [activeTab, setActiveTab] = useState('journal');
     const [isDark, setIsDark] = useState(true);
     const [trades, setTrades] = useState([]);
     const [loadingData, setLoadingData] = useState(false);
 
-    // Modals & Popups
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTrade, setEditingTrade] = useState(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [systemAlert, setSystemAlert] = useState(null);
 
-    // Notifications Logic
     const [notifications, setNotifications] = useState([]);
     const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
     const [hasNewUpdates, setHasNewUpdates] = useState(false);
     const [latestUpdateId, setLatestUpdateId] = useState(0);
 
-    // Nav
     const [viewMode, setViewMode] = useState('home');
     const [authInitialState, setAuthInitialState] = useState(false);
 
-    // --- INITIALISATION ---
     useEffect(() => {
         const savedUser = api.getUser();
         const token = api.getToken();
@@ -77,7 +71,6 @@ function App() {
         else document.documentElement.classList.remove('dark');
     }, [isDark]);
 
-    // --- LOGIQUE METIER ---
     const loadTrades = async () => {
         setLoadingData(true);
         try { const data = await api.getTrades(); setTrades(data); } catch (e) {} finally { setLoadingData(false); }
@@ -128,7 +121,6 @@ function App() {
         loadNotifications();
     };
 
-    // AUTH ACTIONS
     const handleLoginSuccess = (userData) => {
         setUser(userData);
         if (userData.preferences?.defaultView) setActiveTab(userData.preferences.defaultView);
@@ -151,7 +143,6 @@ function App() {
         api.setUser(res.user);
     };
 
-    // NAV ACTIONS
     const navigateToAuth = (isSignUp = false) => { setAuthInitialState(isSignUp); setViewMode('auth'); };
 
     const handleNavClick = (tab) => {
@@ -164,7 +155,6 @@ function App() {
         else setShowUpgradeModal(true);
     };
 
-    // TRADES ACTIONS
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
@@ -172,29 +162,25 @@ function App() {
     const updateTrade = async (tradeData) => { const updatedTrade = await api.updateTrade(tradeData.id, tradeData); setTrades(trades.map(t => t.id === updatedTrade.id ? updatedTrade : t)); handleCloseModal(); };
     const deleteTrade = async (id) => { if (!window.confirm("Supprimer ?")) return; await api.deleteTrade(id); setTrades(trades.filter(t => t.id !== id)); };
 
-    // CALCULS
     const getCurrencySymbol = (code) => { switch(code) { case 'EUR': return '€'; case 'GBP': return '£'; default: return '$'; } };
     const currencyCode = user?.preferences?.currency || 'USD';
     const currencySymbol = getCurrencySymbol(currencyCode);
     const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
 
-    // RENDER
     if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-900'}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-100'}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
     return (
-        /* STRUCTURE MOBILE FIXE : h-[100dvh] + flex-col */
-        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
+        /* HACK IOS : pt-[env(safe-area-inset-top)] pour que le contenu commence SOUS la barre d'état */
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col pt-[env(safe-area-inset-top)]`}>
             <TradingBackground />
 
-            {/* --- POPUPS & MODALS --- */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
 
-                {/* --- SIDEBAR (Desktop seulement) --- */}
                 <Sidebar
                     user={user}
                     activeTab={activeTab}
@@ -205,10 +191,8 @@ function App() {
                     onOpenNotif={openNotifModal}
                 />
 
-                {/* --- ZONE CONTENU (Droite) --- */}
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* Header Mobile (Hauteur fixe, ne bouge pas) */}
                     <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-lg dark:text-white">FollowTrade</span>
@@ -223,10 +207,8 @@ function App() {
                         </div>
                     </header>
 
-                    {/* Contenu Scrollable (Prend toute la place disponible au milieu) */}
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8">
-                        <main className="max-w-7xl mx-auto pb-6"> {/* pb-6 pour aérer le bas */}
-
+                        <main className="max-w-7xl mx-auto pb-6">
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-indigo-100 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div>
@@ -235,20 +217,15 @@ function App() {
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} />}
                                 </div>
                             )}
-
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user.default_risk} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
-
-                            {/* Passation de la fonction de déconnexion */}
                             {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} /></div>}
-
                         </main>
                     </div>
 
-                    {/* Menu Mobile (Hauteur fixe, collé en bas) */}
                     <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} />
                     </div>
