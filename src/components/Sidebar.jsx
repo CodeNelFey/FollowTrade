@@ -37,13 +37,17 @@ const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadN
                 {/* ANALYSES (Couronne si FREE) */}
                 <button onClick={() => onNavClick('graphs')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'graphs' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
                     <div className="flex items-center gap-3"><LineChart size={20} /> Analyses</div>
-                    {user.is_pro === 0 && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
+                    {(user.is_pro < 1 || !user.is_pro) && (
+                        <Crown size={14} className="text-yellow-500 fill-yellow-500" />
+                    )}
                 </button>
 
                 {/* CALENDRIER (Couronne si FREE) */}
                 <button onClick={() => onNavClick('calendar')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
                     <div className="flex items-center gap-3"><CalendarIcon size={20} /> Calendrier</div>
-                    {user.is_pro === 0 && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
+                    {(user.is_pro < 1 || !user.is_pro) && (
+                        <Crown size={14} className="text-yellow-500 fill-yellow-500" />
+                    )}
                 </button>
 
                 <button onClick={() => onNavClick('calculator')} className={navItemClass('calculator')}><Calculator size={20} /> Calculatrice</button>
