@@ -37,7 +37,7 @@
 
 /* --- CONFIGURATION IOS & COULEURS --- */
 :root {
-    --bg-color: #000000;
+    --bg-color: #262626; /* LE FOND PAR DEFAUT DEVIENT GRIS */
 }
 
 html, body {
@@ -45,13 +45,14 @@ html, body {
     padding: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--bg-color); /* Tout noir */
-    overscroll-behavior: none; /* Bloque le rebond blanc */
+    background-color: var(--bg-color); /* GRIS */
+    overscroll-behavior: none;
+    color: white;
 }
 
 #root {
     height: 100%;
     width: 100%;
-    background-color: var(--bg-color);
+    background-color: var(--bg-color); /* GRIS */
     overflow-x: hidden;
 }

@@ -171,10 +171,13 @@ function App() {
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-100'}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
     return (
-        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
+        // 1. LE CONTENEUR PRINCIPAL EST MAINTENANT GRIS (#262626)
+        // Cela garantit que tout ce qui "dépasse" en haut (la barre, le notch) sera gris.
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-[#262626]' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
+
             <TradingBackground />
 
-            {/* ... Modals ... */}
+            {/* ... Modals (Upgrade, Alert, Notif) ... */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
@@ -193,16 +196,8 @@ function App() {
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* --- HEADER MOBILE MODIFIÉ --- */}
-                    {/* J'applique votre couleur #262626 et je le rends "relative" pour l'extension */}
-                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20 relative">
-
-                        {/* L'EXTENSION MAGIQUE (500px vers le haut) */}
-                        {/* bottom-full = collé au dessus du header */}
-                        {/* pointer-events-none = on ne peut pas cliquer dessus */}
-                        <div className="absolute bottom-full left-0 right-0 h-[500px] bg-white/80 dark:bg-[#262626] pointer-events-none"></div>
-
-                        {/* Le contenu normal du header */}
+                    {/* 2. LE HEADER RESTE GRIS (#262626) */}
+                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-lg dark:text-white">FollowTrade</span>
                             <button onClick={openNotifModal} className="relative p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300">
@@ -216,17 +211,21 @@ function App() {
                         </div>
                     </header>
 
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8">
-                        {/* ... Le reste du contenu main ... */}
+                    {/* 3. LE CONTENU REPASSE EN NOIR (#000000) */}
+                    {/* On ajoute 'dark:bg-black' ici pour que le reste de l'app soit bien noir */}
+                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 dark:bg-black">
                         <main className="max-w-7xl mx-auto pb-6">
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                                    {/* ... Contenu du Journal ... */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-indigo-100 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div>
                                     <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} />
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} />}
                                 </div>
                             )}
+
+                            {/* ... Autres onglets ... */}
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} /></div>}
@@ -236,6 +235,7 @@ function App() {
                         </main>
                     </div>
 
+                    {/* 4. MENU MOBILE EN BAS (GRIS ou NOIR selon préférence) */}
                     <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} />
                     </div>
