@@ -59,3 +59,32 @@
 .animate-float-candle {
     animation: float-candle 6s ease-in-out infinite;
 }
+
+:root {
+    /* Définit la couleur de fond de base (noir ou gris très foncé selon votre thème) */
+    --bg-color: #000000;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+
+    /* 1. Applique la couleur sombre au fond du navigateur lui-même */
+    background-color: var(--bg-color);
+
+    /* 2. Empêche le rebond élastique (le scroll "blanc") */
+    overscroll-behavior: none;
+
+    /* 3. Assure que le texte est lisible si le CSS met du temps à charger */
+    color: white;
+}
+
+#root {
+    height: 100%;
+    width: 100%;
+    background-color: var(--bg-color);
+    /* Empêche le débordement horizontal */
+    overflow-x: hidden;
+}
