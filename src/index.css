@@ -37,15 +37,24 @@
 
 /* --- CONFIGURATION IOS & COULEURS --- */
 :root {
-    --bg-color: #262626; /* LE FOND PAR DEFAUT DEVIENT GRIS */
+    /* Valeur par défaut (changée par React) */
+    --bg-global: #000000;
 }
 
-html, body {
+html {
+    /* C'est cette variable qui contrôle la couleur derrière la barre d'état */
+    background-color: var(--bg-global);
+    width: 100%;
+    height: 100%;
+    overscroll-behavior: none;
+}
+
+body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--bg-color); /* GRIS */
+    background-color: var(--bg-global);
     overscroll-behavior: none;
     color: white;
 }
@@ -53,6 +62,7 @@ html, body {
 #root {
     height: 100%;
     width: 100%;
-    background-color: var(--bg-color); /* GRIS */
+    /* Le root hérite aussi de la couleur pour éviter les trous */
+    background-color: var(--bg-global);
     overflow-x: hidden;
 }

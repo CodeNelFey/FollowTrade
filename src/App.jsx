@@ -28,20 +28,41 @@ function App() {
     const [trades, setTrades] = useState([]);
     const [loadingData, setLoadingData] = useState(false);
 
+    // Modals & Popups
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTrade, setEditingTrade] = useState(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [systemAlert, setSystemAlert] = useState(null);
 
+    // Notifications
     const [notifications, setNotifications] = useState([]);
     const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
     const [hasNewUpdates, setHasNewUpdates] = useState(false);
     const [latestUpdateId, setLatestUpdateId] = useState(0);
 
+    // Nav
     const [viewMode, setViewMode] = useState('home');
     const [authInitialState, setAuthInitialState] = useState(false);
 
+    // --- GESTION COULEUR DE FOND (SOLUTION VARIABLE CSS) ---
+    useEffect(() => {
+        const root = document.documentElement; // Cible la balise <html>
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+
+        if (viewMode === 'home' || viewMode === 'auth') {
+            // MODE ACCUEIL : Tout le navigateur devient NOIR
+            root.style.setProperty('--bg-global', '#000000');
+            if (metaTheme) metaTheme.setAttribute('content', '#000000');
+        } else {
+            // MODE APP : Tout le navigateur devient GRIS (#262626)
+            // Cela assure que le "rebond" en haut est gris comme la navbar
+            root.style.setProperty('--bg-global', '#262626');
+            if (metaTheme) metaTheme.setAttribute('content', '#262626');
+        }
+    }, [viewMode]); // Se déclenche quand on change de page
+
+    // --- INITIALISATION ---
     useEffect(() => {
         const savedUser = api.getUser();
         const token = api.getToken();
@@ -71,11 +92,11 @@ function App() {
         else document.documentElement.classList.remove('dark');
     }, [isDark]);
 
+    // --- LOGIQUE METIER ---
     const loadTrades = async () => {
         setLoadingData(true);
         try { const data = await api.getTrades(); setTrades(data); } catch (e) {} finally { setLoadingData(false); }
     };
-
     const checkUpdates = async () => {
         try {
             const updates = await api.getUpdates();
@@ -88,7 +109,6 @@ function App() {
             }
         } catch (e) {}
     };
-
     const loadNotifications = async () => {
         try {
             const data = await api.getNotifications();
@@ -99,7 +119,6 @@ function App() {
             }
         } catch (e) { console.error("Erreur notifs perso", e); }
     };
-
     const checkForSystemAlerts = async () => {
         try {
             const data = await api.getNotifications();
@@ -107,20 +126,17 @@ function App() {
             if (alert) setSystemAlert(alert);
         } catch (e) {}
     };
-
     const closeSystemAlert = async (id) => {
         setSystemAlert(null);
         await api.markSingleNotificationRead(id);
         loadNotifications();
     };
-
     const openNotifModal = async () => {
         setShowNotifModal(true);
         setUnreadNotifsCount(0);
         await api.markNotificationsRead();
         loadNotifications();
     };
-
     const handleLoginSuccess = (userData) => {
         setUser(userData);
         if (userData.preferences?.defaultView) setActiveTab(userData.preferences.defaultView);
@@ -128,7 +144,6 @@ function App() {
         loadTrades();
         setTimeout(() => { checkUpdates(); checkForSystemAlerts(); loadNotifications(); }, 500);
     };
-
     const handleLogout = () => {
         api.removeToken();
         setUser(null);
@@ -136,15 +151,12 @@ function App() {
         setActiveTab('journal');
         setViewMode('home');
     };
-
     const handleUpdateUser = async (updatedData) => {
         const res = await api.updateUser(updatedData);
         setUser(res.user);
         api.setUser(res.user);
     };
-
     const navigateToAuth = (isSignUp = false) => { setAuthInitialState(isSignUp); setViewMode('auth'); };
-
     const handleNavClick = (tab) => {
         const freeTabs = ['journal', 'calculator', 'settings', 'updates'];
         if (tab === 'updates') {
@@ -154,7 +166,6 @@ function App() {
         if (user?.is_pro >= 1 || freeTabs.includes(tab)) setActiveTab(tab);
         else setShowUpgradeModal(true);
     };
-
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
@@ -167,23 +178,24 @@ function App() {
     const currencySymbol = getCurrencySymbol(currencyCode);
     const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
 
-    if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-900'}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
-    if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark bg-black' : 'bg-gray-100'}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
+    // --- RENDER ---
 
+    // 1. HOME & AUTH : On utilise le fond géré par CSS Var (qui est passé à Noir via le useEffect)
+    if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
+    if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
+
+    // 2. APP CONNECTÉE
+    // Le useEffect a passé le fond HTML à #262626 (Gris).
+    // Mais on veut que le contenu PRINCIPAL reste Noir.
     return (
-        // 1. LE CONTENEUR PRINCIPAL EST MAINTENANT GRIS (#262626)
-        // Cela garantit que tout ce qui "dépasse" en haut (la barre, le notch) sera gris.
-        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark bg-[#262626]' : 'bg-gray-50'} overflow-hidden flex flex-col`}>
-
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col`}>
             <TradingBackground />
 
-            {/* ... Modals (Upgrade, Alert, Notif) ... */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
-
                 <Sidebar
                     user={user}
                     activeTab={activeTab}
@@ -196,7 +208,7 @@ function App() {
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* 2. LE HEADER RESTE GRIS (#262626) */}
+                    {/* Header Mobile - Fond Gris (#262626) */}
                     <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
                         <div className="flex items-center gap-3">
                             <span className="font-bold text-lg dark:text-white">FollowTrade</span>
@@ -211,31 +223,39 @@ function App() {
                         </div>
                     </header>
 
-                    {/* 3. LE CONTENU REPASSE EN NOIR (#000000) */}
-                    {/* On ajoute 'dark:bg-black' ici pour que le reste de l'app soit bien noir */}
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 dark:bg-black">
+                    {/* CONTENU PRINCIPAL - Fond NOIR Forcé */}
+                    {/* On ajoute 'bg-black' ici pour que la zone de scroll soit noire, pas grise */}
+                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black">
                         <main className="max-w-7xl mx-auto pb-6">
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-                                    {/* ... Contenu du Journal ... */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white shadow-xl shadow-indigo-500/20 relative overflow-hidden"><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-indigo-100 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div>
                                     <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} />
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} />}
                                 </div>
                             )}
-
-                            {/* ... Autres onglets ... */}
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user.default_risk} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
-                            {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} /></div>}
+                            {activeTab === 'settings' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <SettingsView
+                                        user={user}
+                                        onUpdateUser={handleUpdateUser}
+                                        onClose={() => setActiveTab('journal')}
+                                        onLogout={handleLogout}
+
+                                        /* AJOUTEZ CETTE LIGNE : */
+                                        onNavigate={setActiveTab}
+                                    />
+                                </div>
+                            )}
                         </main>
                     </div>
 
-                    {/* 4. MENU MOBILE EN BAS (GRIS ou NOIR selon préférence) */}
                     <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} />
                     </div>

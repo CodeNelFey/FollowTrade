@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Lock, Mail, Save, AlertTriangle, Sliders, Palette, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut } from 'lucide-react'; // Added LogOut icon
+// AJOUT DE ShieldAlert DANS LES IMPORTS
+import { User, Lock, Mail, Save, AlertTriangle, Sliders, Palette, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut, ShieldAlert } from 'lucide-react';
 import { api } from '../api';
 
 const CURRENCIES = [
@@ -8,7 +9,8 @@ const CURRENCIES = [
     { code: 'GBP', name: 'British Pound', icon: PoundSterling },
 ];
 
-const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added onLogout prop
+// AJOUT DE LA PROP 'onNavigate' ICI
+const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
     const [formData, setFormData] = useState({
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
@@ -169,10 +171,34 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added o
                 </div>
             )}
 
+            {/* --- ZONE ADMIN (VISIBLE UNIQUEMENT SI ADMIN) --- */}
+            {user?.is_pro === 7 && (
+                <div className="mb-8 animate-in fade-in slide-in-from-top-4">
+                    <button
+                        onClick={() => onNavigate('admin')}
+                        className="w-full p-1 bg-gradient-to-r from-fuchsia-600 to-purple-600 rounded-3xl shadow-xl shadow-purple-500/20 group active:scale-95 transition-all"
+                    >
+                        <div className="bg-white dark:bg-neutral-900 rounded-[22px] p-4 flex items-center justify-between group-hover:bg-opacity-90 transition-all">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl text-purple-600 dark:text-purple-400">
+                                    <ShieldAlert size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">Panel Administrateur</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Gérer les utilisateurs et le système</p>
+                                </div>
+                            </div>
+                            <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-neutral-800 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                                <ArrowLeft size={20} className="rotate-180" />
+                            </div>
+                        </div>
+                    </button>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit}>
 
                 {/* --- SECTION 1 : IDENTITÉ & AVATAR --- */}
-                {/* z-index standard ici */}
                 <div className={`${sectionClass} relative z-30`}>
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
                         <User size={18} className="text-indigo-500" />
@@ -286,7 +312,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added o
                 </div>
 
                 {/* --- SECTION 3 : TRADING (Z-INDEX 20) --- */}
-                {/* C'est ici que le fix opère : z-20 est supérieur à z-10 de la section suivante */}
                 <div className={`${sectionClass} relative z-20`}>
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
                         <Sliders size={18} className="text-indigo-500" />
@@ -359,7 +384,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added o
                 </div>
 
                 {/* --- SECTION 4 : INTERFACE (Z-INDEX 10) --- */}
-                {/* z-10 pour être en dessous de la section trading */}
                 <div className={`${sectionClass} relative z-10`}>
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-100 dark:border-neutral-800">
                         <Palette size={18} className="text-indigo-500" />
@@ -412,8 +436,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout }) => { // Added o
                     <button
                         type="submit"
                         disabled={isLoading}
-                        // J'ai ajouté 'w-full' (largeur max mobile) et 'md:w-auto' (taille normale PC)
-                        // J'ai aussi ajouté 'justify-center' pour centrer le texte sur mobile
                         className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
                     >
                         {isLoading ? 'Sauvegarde...' : <><Save size={18} /> Enregistrer les modifications</>}

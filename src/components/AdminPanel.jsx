@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Save, Megaphone, Plus, Calendar, Tag } from 'lucide-react';
+import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Plus } from 'lucide-react';
 
 const AdminPanel = () => {
     const [activeTab, setActiveTab] = useState('users');
@@ -93,28 +93,11 @@ const AdminPanel = () => {
         setIsUpdateModalOpen(true);
     };
 
-    // --- BADGES PREMIUM (Dégradés) ---
     const renderBadge = (is_pro) => {
-        if (is_pro === 7) return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 shadow-sm w-fit justify-center">
-                <ShieldAlert size={12} fill="currentColor" /> ADMIN
-            </div>
-        );
-        if (is_pro === 2) return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 shadow-sm w-fit justify-center">
-                <Sparkles size={12} fill="currentColor" /> VIP
-            </div>
-        );
-        if (is_pro === 1) return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 shadow-sm w-fit justify-center">
-                <Crown size={12} fill="currentColor" /> PRO
-            </div>
-        );
-        return (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 w-fit justify-center">
-                <User size={12} /> FREE
-            </div>
-        );
+        if (is_pro === 7) return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 shadow-sm w-fit justify-center"><ShieldAlert size={12} fill="currentColor" /> ADMIN</div>;
+        if (is_pro === 2) return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 shadow-sm w-fit justify-center"><Sparkles size={12} fill="currentColor" /> VIP</div>;
+        if (is_pro === 1) return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 shadow-sm w-fit justify-center"><Crown size={12} fill="currentColor" /> PRO</div>;
+        return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 w-fit justify-center"><User size={12} /> FREE</div>;
     };
 
     const labelClass = "text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 block";
@@ -134,9 +117,47 @@ const AdminPanel = () => {
                 <>
                     <div className="relative mb-6">
                         <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
-                        <input type="text" placeholder="Rechercher..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white dark:bg-neutral-900/50 pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-neutral-700 focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 dark:text-white transition-all backdrop-blur-sm" />
+                        <input type="text" placeholder="Rechercher un utilisateur..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white dark:bg-neutral-900/50 pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-neutral-700 focus:ring-2 focus:ring-purple-500 outline-none text-gray-900 dark:text-white transition-all backdrop-blur-sm" />
                     </div>
-                    <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl rounded-3xl shadow-xl border border-white/40 dark:border-white/5 overflow-hidden">
+
+                    {/* VUE MOBILE : CARTES (Nouveau bloc) */}
+                    <div className="md:hidden space-y-4">
+                        {filteredUsers.map(u => (
+                            <div key={u.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-5 rounded-2xl border border-white/20 shadow-sm">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
+                                        {u.avatar_url ? <img src={`http://localhost:3000${u.avatar_url}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={20}/></div>}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-900 dark:text-white">{u.first_name} {u.last_name}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{u.email}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-gray-100 dark:border-white/5 pt-4">
+                                    {renderBadge(u.is_pro)}
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleEditUserClick(u)}
+                                            className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-sm font-bold flex items-center gap-2"
+                                        >
+                                            <Edit2 size={14} /> Modifier
+                                        </button>
+                                        {u.is_pro !== 7 && (
+                                            <button
+                                                onClick={() => handleDeleteUser(u.id)}
+                                                className="p-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-lg"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* VUE BUREAU : TABLEAU (Caché sur mobile) */}
+                    <div className="hidden md:block bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl rounded-3xl shadow-xl border border-white/40 dark:border-white/5 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-white/50 dark:bg-black/40 text-gray-500 dark:text-neutral-500 uppercase text-xs font-bold tracking-wider">
@@ -184,11 +205,15 @@ const AdminPanel = () => {
                 </>
             )}
 
+            {/* --- MODALE MODIFICATION UTILISATEUR --- */}
             {editingUser && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
-                    <div className="bg-white dark:bg-neutral-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex justify-between items-center"><h3 className="text-lg font-bold dark:text-white">Modifier Profil</h3><button onClick={() => setEditingUser(null)}><X size={20} className="text-gray-500"/></button></div>
-                        <form onSubmit={handleSaveUser} className="p-6">
+                    <div className="bg-white dark:bg-neutral-900 w-full max-w-lg rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex justify-between items-center flex-none">
+                            <h3 className="text-lg font-bold dark:text-white">Modifier Profil</h3>
+                            <button onClick={() => setEditingUser(null)}><X size={20} className="text-gray-500"/></button>
+                        </div>
+                        <form onSubmit={handleSaveUser} className="p-6 overflow-y-auto">
                             <div className="flex flex-col items-center mb-8">
                                 <div className="relative group">
                                     <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-neutral-800 shadow-xl bg-gray-100 dark:bg-neutral-700 mb-3">{formData.avatar_url ? <img src={`http://localhost:3000${formData.avatar_url}`} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={40} /></div>}</div>
@@ -209,24 +234,28 @@ const AdminPanel = () => {
                                     ))}
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 rounded-xl text-gray-500 font-bold">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Sauvegarder</button></div>
+                            <div className="flex justify-end gap-2 pt-4"><button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 rounded-xl text-gray-500 font-bold">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Sauvegarder</button></div>
                         </form>
                     </div>
                 </div>
             )}
 
+            {/* --- MODALE UPDATES --- */}
             {isUpdateModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
-                    <div className="bg-white dark:bg-neutral-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex justify-between items-center"><h3 className="text-lg font-bold dark:text-white">Message</h3><button onClick={() => setIsUpdateModalOpen(false)}><X size={20} className="text-gray-500"/></button></div>
-                        <form onSubmit={handleSaveUpdate} className="p-6 space-y-4">
+                    <div className="bg-white dark:bg-neutral-900 w-full max-w-lg rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex justify-between items-center flex-none">
+                            <h3 className="text-lg font-bold dark:text-white">Message</h3>
+                            <button onClick={() => setIsUpdateModalOpen(false)}><X size={20} className="text-gray-500"/></button>
+                        </div>
+                        <form onSubmit={handleSaveUpdate} className="p-6 space-y-4 overflow-y-auto">
                             <div><label className={labelClass}>Titre</label><input type="text" value={updateForm.title} onChange={e => setUpdateForm({...updateForm, title: e.target.value})} className={inputClass} required /></div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className={labelClass}>Type</label><select value={updateForm.type} onChange={e => setUpdateForm({...updateForm, type: e.target.value})} className={inputClass}><option value="INFO">Info</option><option value="FEATURE">Nouveauté</option><option value="FIX">Correctif</option><option value="ALERT">Alerte</option></select></div>
                                 <div><label className={labelClass}>Date</label><input type="date" value={updateForm.date} onChange={e => setUpdateForm({...updateForm, date: e.target.value})} className={inputClass} required /></div>
                             </div>
                             <div><label className={labelClass}>Contenu</label><textarea rows="5" value={updateForm.content} onChange={e => setUpdateForm({...updateForm, content: e.target.value})} className={inputClass} required></textarea></div>
-                            <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsUpdateModalOpen(false)} className="px-4 py-2 rounded-xl text-gray-500 font-bold">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Publier</button></div>
+                            <div className="flex justify-end gap-2 pt-4"><button type="button" onClick={() => setIsUpdateModalOpen(false)} className="px-4 py-2 rounded-xl text-gray-500 font-bold">Annuler</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Publier</button></div>
                         </form>
                     </div>
                 </div>
