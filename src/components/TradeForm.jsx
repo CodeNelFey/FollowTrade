@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlusCircle, X, Calendar, ChevronDown, Check, ArrowRightLeft, Wallet, TrendingUp } from 'lucide-react';
+import { PlusCircle, X, Calendar, ChevronDown, Check, ArrowRightLeft, Wallet, TrendingUp, Save } from 'lucide-react';
 
 const PAIRS = [
     { code: 'EURUSD', name: 'Euro / US Dollar' },
@@ -11,19 +11,19 @@ const PAIRS = [
     { code: 'ETHUSD', name: 'Ethereum' },
 ];
 
-const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
+const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, currencySymbol }) => {
     if (!isOpen) return null;
 
     // Mode: 'trade' ou 'transfer'
     const [mode, setMode] = useState('trade');
 
-    // State
+    // State pour Trading
     const [formData, setFormData] = useState({
         pair: '', date: new Date().toISOString().split('T')[0],
         type: 'BUY', entry: '', exit: '', sl: '', tp: '', lot: '', profit: ''
     });
 
-    // State spécifique pour le transfert
+    // State pour Transfert (Solde)
     const [transferData, setTransferData] = useState({
         type: 'DEPOSIT', // DEPOSIT ou WITHDRAWAL
         amount: '',
@@ -32,6 +32,47 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
 
     const [isPairOpen, setIsPairOpen] = useState(false);
     const dropdownRef = useRef(null);
+
+    // --- EFFET POUR PRÉ-REMPLIR SI ÉDITION ---
+    useEffect(() => {
+        if (tradeToEdit) {
+            // Si c'est un mouvement de solde
+            if (tradeToEdit.pair === 'SOLDE') {
+                setMode('transfer');
+                setTransferData({
+                    type: tradeToEdit.type,
+                    amount: Math.abs(parseFloat(tradeToEdit.profit)).toString(),
+                    date: tradeToEdit.date
+                });
+            } else {
+                // Si c'est un vrai trade
+                setMode('trade');
+                setFormData({
+                    pair: tradeToEdit.pair,
+                    date: tradeToEdit.date,
+                    type: tradeToEdit.type,
+                    entry: tradeToEdit.entry,
+                    exit: tradeToEdit.exit,
+                    sl: tradeToEdit.sl,
+                    tp: tradeToEdit.tp,
+                    lot: tradeToEdit.lot,
+                    profit: tradeToEdit.profit
+                });
+            }
+        } else {
+            // Réinitialisation si mode Création
+            setMode('trade');
+            setFormData({
+                pair: '', date: new Date().toISOString().split('T')[0],
+                type: 'BUY', entry: '', exit: '', sl: '', tp: '', lot: '', profit: ''
+            });
+            setTransferData({
+                type: 'DEPOSIT',
+                amount: '',
+                date: new Date().toISOString().split('T')[0],
+            });
+        }
+    }, [tradeToEdit, isOpen]);
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -46,9 +87,11 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
 
+        let finalData = {};
+
         if (mode === 'trade') {
             if(!formData.pair || !formData.entry) return;
-            onAddTrade({ ...formData, id: Date.now() });
+            finalData = { ...formData };
         } else {
             // Logique pour Dépôt/Retrait
             if(!transferData.amount) return;
@@ -56,20 +99,21 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
                 ? parseFloat(transferData.amount)
                 : -parseFloat(transferData.amount);
 
-            onAddTrade({
-                id: Date.now(),
-                pair: 'SOLDE', // Mot clé pour identifier un transfert
+            finalData = {
+                pair: 'SOLDE',
                 type: transferData.type,
                 date: transferData.date,
                 entry: 0, exit: 0, sl: 0, tp: 0, lot: 0,
                 profit: profitValue
-            });
+            };
         }
 
-        onClose();
-        // Reset partiel
-        setFormData({ ...formData, entry: '', exit: '', profit: '', pair: '' });
-        setTransferData({ ...transferData, amount: '' });
+        // --- DISTINCTION AJOUT / MODIFICATION ---
+        if (tradeToEdit) {
+            onUpdateTrade({ ...finalData, id: tradeToEdit.id });
+        } else {
+            onAddTrade(finalData);
+        }
     };
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -89,7 +133,7 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
                 <div className="px-8 py-6 border-b border-gray-100 dark:border-neutral-800 flex justify-between items-center bg-gray-50/50 dark:bg-neutral-900/50 flex-shrink-0">
                     <h3 className="text-xl font-bold flex items-center text-gray-800 dark:text-white">
                         {mode === 'trade' ? <TrendingUp className="mr-2 text-indigo-500" /> : <Wallet className="mr-2 text-emerald-500" />}
-                        {mode === 'trade' ? 'Nouveau Trade' : 'Gestion Solde'}
+                        {tradeToEdit ? 'Modifier le Trade' : (mode === 'trade' ? 'Nouveau Trade' : 'Gestion Solde')}
                     </h3>
                     <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-neutral-800 text-gray-500 transition-colors"><X size={20} /></button>
                 </div>
@@ -175,7 +219,7 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
 
                                 {/* P&L */}
                                 <div className="pt-4 border-t border-gray-100 dark:border-neutral-800">
-                                    <label className={labelClass}>Profit / Perte ($)</label>
+                                    <label className={labelClass}>Profit / Perte ({currencySymbol})</label>
                                     <input type="number" name="profit" placeholder="0.00" value={formData.profit} onChange={handleChange} className={`w-full bg-transparent text-3xl font-bold outline-none mt-1 ${parseFloat(formData.profit) >= 0 ? 'text-emerald-500' : 'text-rose-500'} placeholder-gray-300`} />
                                 </div>
                             </>
@@ -201,7 +245,7 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
                                 </div>
 
                                 <div className={inputContainerClass}>
-                                    <label className={labelClass}>Montant ($)</label>
+                                    <label className={labelClass}>Montant ({currencySymbol})</label>
                                     <input type="number" placeholder="0.00" value={transferData.amount} onChange={(e) => setTransferData({...transferData, amount: e.target.value})} className={`${inputClass} text-2xl font-bold`} />
                                 </div>
                             </div>
@@ -210,7 +254,10 @@ const TradeForm = ({ isOpen, onClose, onAddTrade }) => {
                         {/* Footer Buttons */}
                         <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-neutral-800">
                             <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors">Annuler</button>
-                            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95">Valider</button>
+                            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95">
+                                {tradeToEdit ? <Save size={18} /> : <PlusCircle size={18} />}
+                                {tradeToEdit ? 'Mettre à jour' : 'Valider'}
+                            </button>
                         </div>
 
                     </form>

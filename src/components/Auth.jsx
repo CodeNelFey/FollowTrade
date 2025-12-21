@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { api } from '../api';
 import { Lock, Mail, LogIn, UserPlus, AlertCircle, User } from 'lucide-react';
 
-const Auth = ({ onLoginSuccess }) => {
+const Auth = ({ onLoginSuccess, initialSignUp = false }) => {
     const [loading, setLoading] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
+    // On initialise l'état avec la prop reçue
+    const [isSignUp, setIsSignUp] = useState(initialSignUp);
     const [error, setError] = useState(null);
 
     // Champs du formulaire

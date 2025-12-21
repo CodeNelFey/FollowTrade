@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calculator, RefreshCw, AlertCircle, Target, Wallet, ArrowDownToLine, ChevronDown, Check } from 'lucide-react';
 
-// Mapping des symboles pour l'API Binance
 const API_SYMBOLS = {
     'EURUSD': 'EURUSDT',
     'GBPUSD': 'GBPUSDT',
@@ -21,7 +20,7 @@ const PAIRS = [
     { code: 'ETHUSD', name: 'Ethereum', type: 'CRYPTO' },
 ];
 
-const PositionCalculator = ({ currentBalance, defaultRisk }) => {
+const PositionCalculator = ({ currentBalance, defaultRisk, currencySymbol }) => {
     // --- STATES ---
     const [balance, setBalance] = useState(currentBalance || 10000);
     const [riskPercent, setRiskPercent] = useState(defaultRisk || 1.0);
@@ -116,7 +115,7 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
     const labelClass = "text-xs font-bold text-gray-500 dark:text-neutral-500 uppercase tracking-wider mb-2 block";
 
     return (
-        <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-white/40 dark:border-white/5 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+        <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-white/40 dark:border-white/5 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 mb-20">
 
             {/* HEADER */}
             <div className="flex items-center justify-between mb-8">
@@ -133,7 +132,7 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
 
                 {/* Capital */}
                 <div>
-                    <label className={labelClass}>Capital ($)</label>
+                    <label className={labelClass}>Capital ({currencySymbol})</label>
                     <div className="relative">
                         <Wallet className="absolute left-3 top-3.5 text-gray-400" size={16} />
                         <input type="number" value={balance} onChange={(e) => setBalance(parseFloat(e.target.value))} className={`${inputClass} pl-10`} />
@@ -149,7 +148,7 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
                     </div>
                 </div>
 
-                {/* Sélection Paire (Custom Dropdown) */}
+                {/* Sélection Paire */}
                 <div ref={dropdownRef}>
                     <label className={labelClass}>Paire</label>
                     <div className="relative">
@@ -165,7 +164,6 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
                             <ChevronDown size={16} className={`text-gray-400 transition-transform ${isPairOpen ? 'rotate-180' : ''}`} />
                         </button>
 
-                        {/* Dropdown Menu */}
                         {isPairOpen && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xl border border-gray-100 dark:border-neutral-700 max-h-60 overflow-y-auto z-50 p-1 animate-in fade-in zoom-in-95 duration-100">
                                 {PAIRS.map((p) => (
@@ -199,10 +197,7 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
             {/* --- SECTION 2 : PRIX & SL --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-                {/* Colonne GAUCHE : Inputs */}
                 <div className="space-y-6">
-
-                    {/* Prix Entrée */}
                     <div>
                         <div className="flex justify-between mb-2">
                             <label className={labelClass}>Prix d'Entrée</label>
@@ -222,7 +217,6 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
                         </div>
                     </div>
 
-                    {/* Stop Loss */}
                     <div>
                         <label className={labelClass}>Stop Loss (Prix)</label>
                         <div className="relative">
@@ -241,23 +235,19 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
                             </div>
                         )}
                     </div>
-
                 </div>
 
-                {/* Colonne DROITE : Résultats */}
                 <div className="bg-gray-50 dark:bg-black/30 rounded-2xl p-6 border border-gray-100 dark:border-neutral-800 flex flex-col justify-center space-y-6">
 
-                    {/* Risque Cash */}
                     <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-500 dark:text-neutral-400">Montant à Risquer</span>
                         <span className="text-xl font-bold text-rose-500">
-                  {riskAmount.toFixed(2)} $
+                  {riskAmount.toFixed(2)} {currencySymbol}
                </span>
                     </div>
 
                     <div className="h-px bg-gray-200 dark:bg-neutral-700 border-dashed"></div>
 
-                    {/* Résultat Principal */}
                     <div className="text-center">
                         <span className="text-sm font-bold text-gray-400 uppercase tracking-widest block mb-2">Taille de position conseillée</span>
                         <div className="text-5xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight drop-shadow-sm">
@@ -268,7 +258,6 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
                </span>
                     </div>
 
-                    {/* Units raw */}
                     {isFinite(lotSize) && lotSize > 0 && pair.type === 'FOREX' && (
                         <div className="text-center text-xs text-gray-400 font-mono">
                             ({(lotSize * 100000).toLocaleString()} unités)
@@ -279,7 +268,6 @@ const PositionCalculator = ({ currentBalance, defaultRisk }) => {
 
             </div>
 
-            {/* Note de bas de page */}
             <div className="mt-8 bg-yellow-50/50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-100 dark:border-yellow-900/30 flex gap-3">
                 <AlertCircle className="text-yellow-600 flex-shrink-0" size={18} />
                 <p className="text-xs text-yellow-800 dark:text-yellow-500 leading-relaxed">
