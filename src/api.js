@@ -1,16 +1,31 @@
-//const API_URL = 'http://localhost:3000/api';
-const API_URL = '/api'
+// Définir l'URL de base ici (http://localhost:3000 en dev, ou https://ton-site.com en prod)
+// Astuce : En prod, tu peux mettre '' si le front et le back sont sur le même domaine.
+export const BASE_URL = 'http://localhost:3000';
+
+const API_URL = `${BASE_URL}/api`;
 
 export const api = {
+    // --- UTILITAIRE IMAGE ---
+    getAvatarUrl: (path) => {
+        if (!path) return null;
+        // Si c'est déjà une URL complète (ex: Google Auth ou Blob preview), on la retourne telle quelle
+        if (path.startsWith('http') || path.startsWith('blob:')) return path;
+        // Sinon, on colle l'URL du serveur devant
+        return `${BASE_URL}${path}`;
+    },
+
+    // --- GESTION TOKEN & STORAGE ---
     getToken: () => localStorage.getItem('token'),
     setToken: (token) => localStorage.setItem('token', token),
     removeToken: () => localStorage.removeItem('token'),
+
+    // Récupère l'utilisateur stocké (contient désormais .colors et .is_pro)
     getUser: () => {
         try { return JSON.parse(localStorage.getItem('user')); } catch(e) { return null; }
     },
     setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
 
-    // Auth
+    // --- AUTHENTIFICATION ---
     login: async (email, password) => {
         const res = await fetch(`${API_URL}/login`, {
             method: 'POST',
@@ -27,7 +42,10 @@ export const api = {
         });
         return res.json();
     },
+
+    // --- USER PROFILE (C'est ici que les couleurs sont envoyées) ---
     updateUser: async (userData) => {
+        // userData contient maintenant { ..., colors: {...}, is_pro: ... } grâce à SettingsView
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/user/update`, {
             method: 'PUT',
@@ -48,7 +66,7 @@ export const api = {
         return res.json();
     },
 
-    // --- ADMIN ---
+    // --- ADMIN PANEL ---
     adminGetAllUsers: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -72,7 +90,7 @@ export const api = {
         return res.json();
     },
 
-    // --- UPDATES ---
+    // --- UPDATES (Nouveautés) ---
     getUpdates: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/updates`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -114,6 +132,13 @@ export const api = {
     markSingleNotificationRead: async (id) => {
         const token = localStorage.getItem('token');
         await fetch(`${API_URL}/notifications/read/${id}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+    markNotificationsRead: async () => {
+        const token = localStorage.getItem('token');
+        await fetch(`${API_URL}/notifications/read`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` }
         });

@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Wallet, Percent, LineChart, BarChart3, CalendarDays } from 'lucide-react';
 
-const GraphView = ({ trades, currencySymbol }) => {
+const GraphView = ({ trades, currencySymbol, colors }) => { // Ajout de colors
     const [chartType, setChartType] = useState('BALANCE'); // 'BALANCE', 'PROFIT', 'PERCENT'
     const [graphStyle, setGraphStyle] = useState('AREA'); // 'AREA' ou 'BAR'
     const [timeRange, setTimeRange] = useState('ALL'); // '1W', '1M', '3M', '1Y', 'ALL'
@@ -75,16 +75,16 @@ const GraphView = ({ trades, currencySymbol }) => {
     // --- 3. CONFIGURATION GRAPHIQUE ---
     const getChartConfig = () => {
         switch (chartType) {
-            case 'PROFIT': return { dataKey: 'profit', label: `Gain Quotidien (${currencySymbol})`, color: '#10b981' };
-            case 'PERCENT': return { dataKey: 'percent', label: 'Performance Quotidienne (%)', color: '#10b981' }; // VERT (comme Profit)
-            case 'BALANCE': default: return { dataKey: 'balance', label: `Évolution Solde (${currencySymbol})`, color: '#6366f1' };
+            case 'PROFIT': return { dataKey: 'profit', label: `Gain Quotidien (${currencySymbol})`, color: colors.win };
+            case 'PERCENT': return { dataKey: 'percent', label: 'Performance Quotidienne (%)', color: colors.win };
+            case 'BALANCE': default: return { dataKey: 'balance', label: `Évolution Solde (${currencySymbol})`, color: colors.balance };
         }
     };
 
     const config = getChartConfig();
     const lastValue = filteredData.length > 0 ? filteredData[filteredData.length - 1][config.dataKey] : 0;
 
-    // --- 4. CALCUL DU GRADIENT (ROUGE SI NÉGATIF pour Profit/Percent) ---
+    // --- 4. CALCUL DU GRADIENT (Pour Win/Loss dynamique) ---
     const gradientOffset = () => {
         const dataMax = Math.max(...filteredData.map((i) => i[config.dataKey]));
         const dataMin = Math.min(...filteredData.map((i) => i[config.dataKey]));
@@ -98,28 +98,36 @@ const GraphView = ({ trades, currencySymbol }) => {
     const off = gradientOffset();
 
     // --- COMPOSANTS UI ---
-    const FilterButton = ({ type, label, icon: Icon }) => (
-        <button
-            onClick={() => setChartType(type)}
-            className={`flex-1 flex flex-col md:flex-row items-center justify-center gap-2 py-3 px-2 rounded-xl border transition-all ${
-                chartType === type
-                    ? 'bg-white dark:bg-neutral-800 border-indigo-500 shadow-lg shadow-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                    : 'bg-transparent border-transparent text-gray-400 hover:bg-white/50 dark:hover:bg-white/5'
-            }`}
-        >
-            <Icon size={16} />
-            <span className="text-[10px] md:text-xs font-bold uppercase">{label}</span>
-        </button>
-    );
+    const FilterButton = ({ type, label, icon: Icon }) => {
+        const isActive = chartType === type;
+        // On choisit la couleur active en fonction du type
+        const activeColor = type === 'BALANCE' ? colors.balance : colors.win;
+
+        return (
+            <button
+                onClick={() => setChartType(type)}
+                className="flex-1 flex flex-col md:flex-row items-center justify-center gap-2 py-3 px-2 rounded-xl border transition-all"
+                style={isActive ? {
+                    backgroundColor: 'rgba(255,255,255, 0.1)', // Légère teinte background
+                    borderColor: activeColor,
+                    color: activeColor,
+                    boxShadow: `0 4px 14px -4px ${activeColor}40` // Ombre colorée
+                } : {
+                    borderColor: 'transparent',
+                    color: '#9ca3af' // gray-400
+                }}
+            >
+                <Icon size={16} />
+                <span className="text-[10px] md:text-xs font-bold uppercase">{label}</span>
+            </button>
+        );
+    };
 
     const TimeButton = ({ value, label }) => (
         <button
             onClick={() => setTimeRange(value)}
-            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
-                timeRange === value
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10'
-            }`}
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${timeRange !== value ? 'text-gray-500 hover:bg-gray-200 dark:hover:bg-white/10' : 'text-white shadow-md'}`}
+            style={timeRange === value ? { backgroundColor: colors.balance } : {}}
         >
             {label}
         </button>
@@ -129,10 +137,17 @@ const GraphView = ({ trades, currencySymbol }) => {
         if (active && payload && payload.length) {
             const val = payload[0].value;
             const isPositive = val >= 0;
+
+            // Couleur dynamique pour le texte du tooltip
+            let valueColor = colors.balance;
+            if (chartType !== 'BALANCE') {
+                valueColor = isPositive ? colors.win : colors.loss;
+            }
+
             return (
                 <div className="bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md p-4 rounded-xl shadow-xl border border-white/20 dark:border-white/10">
                     <p className="text-xs font-bold text-gray-400 mb-1">{payload[0].payload.fullDate}</p>
-                    <p className={`text-lg font-black ${chartType === 'BALANCE' ? (isPositive ? 'text-indigo-600 dark:text-indigo-400' : 'text-indigo-600 dark:text-indigo-400') : (isPositive ? 'text-emerald-500' : 'text-rose-500')}`}>
+                    <p className="text-lg font-black" style={{ color: valueColor }}>
                         {chartType !== 'BALANCE' && (isPositive ? '+' : '')}
                         {val.toFixed(2)}
                         {chartType === 'PERCENT' ? '%' : ` ${currencySymbol}`}
@@ -158,7 +173,8 @@ const GraphView = ({ trades, currencySymbol }) => {
                     </div>
                     <button
                         onClick={() => setGraphStyle(prev => prev === 'AREA' ? 'BAR' : 'AREA')}
-                        className="w-14 bg-gray-100/50 dark:bg-neutral-900/50 p-1.5 rounded-2xl flex items-center justify-center hover:bg-white dark:hover:bg-neutral-800 border border-transparent hover:border-indigo-500/30 transition-all text-indigo-500 shadow-sm"
+                        className="w-14 bg-gray-100/50 dark:bg-neutral-900/50 p-1.5 rounded-2xl flex items-center justify-center hover:bg-white dark:hover:bg-neutral-800 border border-transparent hover:border-indigo-500/30 transition-all shadow-sm"
+                        style={{ color: colors.balance }}
                     >
                         {graphStyle === 'AREA' ? <BarChart3 size={20} /> : <LineChart size={20} />}
                     </button>
@@ -186,14 +202,14 @@ const GraphView = ({ trades, currencySymbol }) => {
                         <h3 className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
                             {chartType === 'BALANCE' ? 'Valeur Actuelle' : `Cumul Période ${config.label}`}
                         </h3>
-                        <div className={`text-4xl font-black tracking-tight ${chartType === 'BALANCE' ? 'text-gray-900 dark:text-white' : (lastValue >= 0 ? 'text-emerald-500' : 'text-rose-500')}`}>
+                        <div className="text-4xl font-black tracking-tight" style={{ color: chartType === 'BALANCE' ? (isDark => isDark ? '#FFF' : '#111') /* Garder blanc/noir pour le titre principal */ : (lastValue >= 0 ? colors.win : colors.loss) }}>
                             {chartType !== 'BALANCE' && lastValue > 0 ? '+' : ''}{lastValue.toFixed(2)}
                             <span className="text-lg text-gray-400 ml-1">
                                 {chartType === 'PERCENT' ? '%' : currencySymbol}
                             </span>
                         </div>
                     </div>
-                    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl text-indigo-500">
+                    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl" style={{ color: colors.balance }}>
                         {graphStyle === 'AREA' ? <LineChart size={24} /> : <BarChart3 size={24} />}
                     </div>
                 </div>
@@ -203,20 +219,20 @@ const GraphView = ({ trades, currencySymbol }) => {
                         {graphStyle === 'AREA' ? (
                             <AreaChart data={filteredData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                 <defs>
-                                    {/* Dégradé SOLDE (Simple) */}
+                                    {/* Dégradé SOLDE Dynamique */}
                                     <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor={colors.balance} stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor={colors.balance} stopOpacity={0}/>
                                     </linearGradient>
 
-                                    {/* Dégradé GAINS/PERCENT (Split Vert/Rouge) */}
+                                    {/* Dégradé GAINS/PERCENT Dynamique (Split Win/Loss) */}
                                     <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset={off} stopColor="#10b981" stopOpacity={0.4} />
-                                        <stop offset={off} stopColor="#f43f5e" stopOpacity={0.4} />
+                                        <stop offset={off} stopColor={colors.win} stopOpacity={0.4} />
+                                        <stop offset={off} stopColor={colors.loss} stopOpacity={0.4} />
                                     </linearGradient>
                                     <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset={off} stopColor="#10b981" stopOpacity={1} />
-                                        <stop offset={off} stopColor="#f43f5e" stopOpacity={1} />
+                                        <stop offset={off} stopColor={colors.win} stopOpacity={1} />
+                                        <stop offset={off} stopColor={colors.loss} stopOpacity={1} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.1)" />
@@ -241,7 +257,7 @@ const GraphView = ({ trades, currencySymbol }) => {
                                     <Area
                                         type="monotone"
                                         dataKey={config.dataKey}
-                                        stroke={config.color}
+                                        stroke={colors.balance}
                                         strokeWidth={3}
                                         fillOpacity={1}
                                         fill="url(#colorBalance)"
@@ -280,8 +296,8 @@ const GraphView = ({ trades, currencySymbol }) => {
                                     {filteredData.map((entry, index) => (
                                         <Cell
                                             key={`cell-${index}`}
-                                            // Balance = Toujours Indigo. Autres = Vert/Rouge
-                                            fill={chartType === 'BALANCE' ? config.color : (entry[config.dataKey] >= 0 ? '#10b981' : '#f43f5e')}
+                                            // Balance = Couleur Balance. Autres = Win/Loss selon valeur
+                                            fill={chartType === 'BALANCE' ? colors.balance : (entry[config.dataKey] >= 0 ? colors.win : colors.loss)}
                                         />
                                     ))}
                                 </Bar>
