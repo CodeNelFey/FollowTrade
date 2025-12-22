@@ -1,6 +1,8 @@
 // Définir l'URL de base ici (http://localhost:3000 en dev, ou https://ton-site.com en prod)
 // Astuce : En prod, tu peux mettre '' si le front et le back sont sur le même domaine.
-export const BASE_URL = 'http://localhost:3000';
+
+//export const BASE_URL = 'http://localhost:3000';
+export const BASE_URL = '';
 
 const API_URL = `${BASE_URL}/api`;
 
