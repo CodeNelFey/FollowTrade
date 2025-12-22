@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Shield, Zap, ChevronRight, BarChart3, Lock, Smartphone, Globe } from 'lucide-react';
+import { TrendingUp, Shield, Zap, ChevronRight, BarChart3, Smartphone } from 'lucide-react';
 
 const Home = ({ onNavigateToAuth }) => {
     return (
@@ -7,10 +7,13 @@ const Home = ({ onNavigateToAuth }) => {
 
             {/* --- NAVBAR --- */}
             <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 md:px-12 md:py-6 bg-black/50 backdrop-blur-xl border-b border-white/5">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                        <TrendingUp size={18} className="text-white" />
-                    </div>
+                <div className="flex items-center gap-3">
+                    <img
+                        src="/followTradeLogo.png"
+                        alt="Logo FollowTrade"
+                        className="w-10 h-10 object-contain rounded-xl"
+                    />
+
                     <span className="font-bold text-lg tracking-tight">FollowTrade</span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -54,7 +57,7 @@ const Home = ({ onNavigateToAuth }) => {
                     Le journal de trading intelligent qui analyse vos performances, détecte vos erreurs et vous aide à progresser. Rejoignez l'élite.
                 </p>
 
-                {/* Boutons d'action (Stackés sur mobile, ligne sur PC) */}
+                {/* Boutons d'action */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
                     <button
                         onClick={() => onNavigateToAuth(true)}
@@ -75,7 +78,7 @@ const Home = ({ onNavigateToAuth }) => {
             <section className="px-6 pb-24 max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
 
-                    {/* Carte 1 : Large */}
+                    {/* Carte 1 */}
                     <div className="md:col-span-2 bg-neutral-900/50 border border-white/5 rounded-3xl p-6 md:p-10 relative overflow-hidden group hover:border-white/10 transition-colors">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-[100px] -mr-16 -mt-16 pointer-events-none"></div>
                         <div className="relative z-10">
@@ -89,7 +92,7 @@ const Home = ({ onNavigateToAuth }) => {
                         </div>
                     </div>
 
-                    {/* Carte 2 : Carrée */}
+                    {/* Carte 2 */}
                     <div className="bg-neutral-900/50 border border-white/5 rounded-3xl p-6 md:p-10 relative overflow-hidden group hover:border-white/10 transition-colors">
                         <div className="absolute bottom-0 left-0 w-40 h-40 bg-emerald-600/10 rounded-full blur-[80px] pointer-events-none"></div>
                         <div className="relative z-10">
@@ -103,7 +106,7 @@ const Home = ({ onNavigateToAuth }) => {
                         </div>
                     </div>
 
-                    {/* Carte 3 : Carrée */}
+                    {/* Carte 3 */}
                     <div className="bg-neutral-900/50 border border-white/5 rounded-3xl p-6 md:p-10 relative overflow-hidden group hover:border-white/10 transition-colors">
                         <div className="absolute top-0 right-0 w-40 h-40 bg-amber-600/10 rounded-full blur-[80px] pointer-events-none"></div>
                         <div className="relative z-10">
@@ -117,7 +120,7 @@ const Home = ({ onNavigateToAuth }) => {
                         </div>
                     </div>
 
-                    {/* Carte 4 : Large */}
+                    {/* Carte 4 */}
                     <div className="md:col-span-2 bg-neutral-900/50 border border-white/5 rounded-3xl p-6 md:p-10 relative overflow-hidden group hover:border-white/10 transition-colors">
                         <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-600/20 rounded-full blur-[100px] -mr-10 -mb-10 pointer-events-none"></div>
                         <div className="relative z-10">
