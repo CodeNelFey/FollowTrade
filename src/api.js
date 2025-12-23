@@ -2,7 +2,9 @@
 // Astuce : En prod, tu peux mettre '' si le front et le back sont sur le même domaine.
 
 //export const BASE_URL = 'http://localhost:3000';
-export const BASE_URL = '';
+export const BASE_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : '';
 
 const API_URL = `${BASE_URL}/api`;
 
@@ -10,9 +12,14 @@ export const api = {
     // --- UTILITAIRE IMAGE ---
     getAvatarUrl: (path) => {
         if (!path) return null;
-        // Si c'est déjà une URL complète (ex: Google Auth ou Blob preview), on la retourne telle quelle
-        if (path.startsWith('http') || path.startsWith('blob:')) return path;
-        // Sinon, on colle l'URL du serveur devant
+
+        // 1. Si c'est un Blob (prévisualisation immédiate après upload)
+        if (path.startsWith('blob:')) return path;
+
+        // 2. Si c'est une URL absolue (Google Auth ou lien externe)
+        if (path.startsWith('http')) return path;
+
+        // 3. Si c'est un chemin relatif (ex: /uploads/image.jpg), on ajoute le serveur
         return `${BASE_URL}${path}`;
     },
 

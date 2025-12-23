@@ -244,7 +244,16 @@ function App() {
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
                     {/* HEADER (Mobile Only) */}
-                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
+                    <header className="
+                        h-[calc(4rem+env(safe-area-inset-top))]
+                        pt-[env(safe-area-inset-top)]
+                        md:hidden
+                        bg-white/80 dark:bg-[#262626]
+                        backdrop-blur-xl
+                        border-b border-gray-200 dark:border-neutral-800
+                        flex items-center justify-between
+                        px-4
+                        z-20">
                         <div className="flex items-center gap-3 overflow-hidden">
                             <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
                                 {avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}
