@@ -17,7 +17,7 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
     const btnClass = (tab) => `flex flex-col items-center justify-center p-2 rounded-xl relative transition-all ${activeTab === tab ? 'font-bold' : 'text-gray-400'}`;
 
     return (
-        <div className="md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 p-2 grid grid-cols-5 gap-1">
+        <div className="md:hidden bg-white dark:bg-[#262626] border-t border-gray-200 dark:border-neutral-800 p-2 grid grid-cols-5 gap-1">
 
             <button
                 onClick={() => onNavClick('journal')}
