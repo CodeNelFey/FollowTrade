@@ -342,7 +342,7 @@ function App() {
                     </div>
 
                     {/* MENU MOBILE (BOTTOM) */}
-                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
+                    <div className="pb-[env(safe-area-inset-bottom)] flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>

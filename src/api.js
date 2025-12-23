@@ -1,10 +1,11 @@
-// Définir l'URL de base ici (http://localhost:3000 en dev, ou https://ton-site.com en prod)
-// Astuce : En prod, tu peux mettre '' si le front et le back sont sur le même domaine.
+// src/api.js
 
-//export const BASE_URL = 'http://localhost:3000';
-export const BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:3000'
-    : '';
+// Détection dynamique de l'IP pour que ça marche sur Mobile ET PC
+const hostname = window.location.hostname; // ex: 'localhost' ou '192.168.1.15'
+
+export const BASE_URL = (hostname === 'localhost' || hostname.startsWith('192.168') || hostname.startsWith('10.'))
+    ? `http://${hostname}:3000` // En dev/réseau local : on utilise l'IP actuelle + port 3000
+    : ''; // En production (ex: Vercel/Render) : URL relative
 
 const API_URL = `${BASE_URL}/api`;
 
@@ -13,28 +14,26 @@ export const api = {
     getAvatarUrl: (path) => {
         if (!path) return null;
 
-        // 1. Si c'est un Blob (prévisualisation immédiate après upload)
+        // 1. Blob (prévisualisation upload)
         if (path.startsWith('blob:')) return path;
 
-        // 2. Si c'est une URL absolue (Google Auth ou lien externe)
+        // 2. URL absolue déjà complète (ex: Google ou anciennes données)
         if (path.startsWith('http')) return path;
 
-        // 3. Si c'est un chemin relatif (ex: /uploads/image.jpg), on ajoute le serveur
+        // 3. Chemin relatif : on colle la BASE_URL dynamique devant
         return `${BASE_URL}${path}`;
     },
 
-    // --- GESTION TOKEN & STORAGE ---
+    // ... LE RESTE DU FICHIER NE CHANGE PAS ...
     getToken: () => localStorage.getItem('token'),
     setToken: (token) => localStorage.setItem('token', token),
     removeToken: () => localStorage.removeItem('token'),
 
-    // Récupère l'utilisateur stocké (contient désormais .colors et .is_pro)
     getUser: () => {
         try { return JSON.parse(localStorage.getItem('user')); } catch(e) { return null; }
     },
     setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
 
-    // --- AUTHENTIFICATION ---
     login: async (email, password) => {
         const res = await fetch(`${API_URL}/login`, {
             method: 'POST',
@@ -51,10 +50,7 @@ export const api = {
         });
         return res.json();
     },
-
-    // --- USER PROFILE (C'est ici que les couleurs sont envoyées) ---
     updateUser: async (userData) => {
-        // userData contient maintenant { ..., colors: {...}, is_pro: ... } grâce à SettingsView
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/user/update`, {
             method: 'PUT',
@@ -74,8 +70,6 @@ export const api = {
         });
         return res.json();
     },
-
-    // --- ADMIN PANEL ---
     adminGetAllUsers: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -98,8 +92,6 @@ export const api = {
         });
         return res.json();
     },
-
-    // --- UPDATES (Nouveautés) ---
     getUpdates: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/updates`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -131,8 +123,6 @@ export const api = {
         });
         return res.json();
     },
-
-    // --- NOTIFICATIONS ---
     getNotifications: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/notifications`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -152,8 +142,6 @@ export const api = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
     },
-
-    // --- TRADES ---
     getTrades: async () => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_URL}/trades`, { headers: { 'Authorization': `Bearer ${token}` } });

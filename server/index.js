@@ -27,6 +27,8 @@ const storage = multer.diskStorage({
     }
 });
 
+// NOTE: Cette fonction n'est plus utilisée dans les routes JSON pour éviter les soucis d'IP mobile
+// On laisse le frontend construire l'URL complète.
 const getProfilePhotoUrl = (avatarPath) => {
     if (!avatarPath) return null;
     if (avatarPath.startsWith('http')) return avatarPath;
@@ -57,27 +59,22 @@ const addColumnIfNotExists = (tableName, columnName, columnDefinition) => {
 };
 
 db.serialize(() => {
-    // Création TABLE USERS
     db.run(`CREATE TABLE IF NOT EXISTS users (
-                                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                 email TEXT UNIQUE,
-                                                 password TEXT,
-                                                 first_name TEXT,
-                                                 last_name TEXT,
-                                                 default_risk REAL DEFAULT 1.0,
-                                                 preferences TEXT DEFAULT '{}',
-                                                 avatar_url TEXT,
-                                                 is_pro INTEGER DEFAULT 0
-            )`);
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE,
+        password TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        default_risk REAL DEFAULT 1.0,
+        preferences TEXT DEFAULT '{}',
+        avatar_url TEXT,
+        is_pro INTEGER DEFAULT 0,
+        colors TEXT
+    )`);
 
-    // AJOUT DE LA COLONNE COLORS (Si elle n'existe pas)
-    // On met les couleurs par défaut en JSON stringifié
+    // Défauts
     const defaultColors = JSON.stringify({
-        balance: '#4f46e5',
-        buy: '#2563eb',
-        sell: '#ea580c',
-        win: '#10b981',
-        loss: '#f43f5e'
+        balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e'
     });
 
     addColumnIfNotExists('users', 'first_name', "TEXT DEFAULT ''");
@@ -86,10 +83,8 @@ db.serialize(() => {
     addColumnIfNotExists('users', 'preferences', "TEXT DEFAULT '{}'");
     addColumnIfNotExists('users', 'avatar_url', "TEXT DEFAULT ''");
     addColumnIfNotExists('users', 'is_pro', "INTEGER DEFAULT 0");
-    // C'est ici que la magie opère pour la BDD :
     addColumnIfNotExists('users', 'colors', `TEXT DEFAULT '${defaultColors}'`);
 
-    // Autres tables (Trades, Notifications...)
     db.run(`CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, pair TEXT, date TEXT, type TEXT, entry REAL, exit REAL, sl REAL, tp REAL, lot REAL, profit REAL, FOREIGN KEY(user_id) REFERENCES users(id))`);
     db.run(`CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, type TEXT, date TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, message TEXT, type TEXT, is_read INTEGER DEFAULT 0, date TEXT, FOREIGN KEY(user_id) REFERENCES users(id))`);
@@ -116,11 +111,12 @@ app.post('/api/login', (req, res) => {
 
         const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: '24h' });
 
-        // Parsing des JSON stockés en TEXT
         let prefs = {}; try { prefs = JSON.parse(user.preferences); } catch(e) {}
-        let colors = {}; try { colors = JSON.parse(user.colors); } catch(e) {} // Important pour le login
+        let colors = {}; try { colors = JSON.parse(user.colors); } catch(e) {}
 
-        user.avatar_url = getProfilePhotoUrl(user.avatar_url);
+        // MODIF IMPORTANTE : On ne transforme PAS l'URL ici.
+        // On envoie le chemin relatif (ex: /uploads/img.png) et le front gère l'IP.
+        // user.avatar_url = getProfilePhotoUrl(user.avatar_url); <--- SUPPRIMÉ
 
         res.json({ token, user: { ...user, password: '', preferences: prefs, colors: colors } });
     });
@@ -129,14 +125,12 @@ app.post('/api/login', (req, res) => {
 app.post('/api/register', (req, res) => {
     const { email, password, first_name, last_name } = req.body;
     const hashedPassword = bcrypt.hashSync(password, 8);
-    // On laisse SQLite utiliser la valeur DEFAULT pour 'colors'
     db.run(`INSERT INTO users (email, password, first_name, last_name, is_pro) VALUES (?, ?, ?, ?, 0)`,
         [email, hashedPassword, first_name || '', last_name || ''],
         function(err) {
             if (err) return res.status(400).json({ error: "Email utilisé" });
             const token = jwt.sign({ id: this.lastID, email }, SECRET_KEY, { expiresIn: '24h' });
 
-            // On récupère le user créé pour renvoyer les défauts au front
             db.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (err, newUser) => {
                 let colors = {}; try { colors = JSON.parse(newUser.colors); } catch(e) {}
                 res.json({ token, user: { ...newUser, password: '', colors: colors } });
@@ -145,10 +139,9 @@ app.post('/api/register', (req, res) => {
     );
 });
 
-// --- MISE À JOUR USER (Update Colors) ---
+// --- MISE À JOUR USER ---
 app.put('/api/user/update', authenticateToken, (req, res) => {
     const { first_name, last_name, email, password, default_risk, preferences, colors, is_pro } = req.body;
-
     let updates = [], params = [];
 
     if (first_name !== undefined) { updates.push("first_name = ?"); params.push(first_name); }
@@ -156,16 +149,8 @@ app.put('/api/user/update', authenticateToken, (req, res) => {
     if (email !== undefined) { updates.push("email = ?"); params.push(email); }
     if (default_risk !== undefined) { updates.push("default_risk = ?"); params.push(default_risk); }
     if (is_pro !== undefined) { updates.push("is_pro = ?"); params.push(is_pro); }
-
-    // Convertir Prefs en String pour la DB
     if (preferences !== undefined) { updates.push("preferences = ?"); params.push(JSON.stringify(preferences)); }
-
-    // Convertir Colors en String pour la DB (C'EST ICI QUE ÇA SE JOUE)
-    if (colors !== undefined) {
-        updates.push("colors = ?");
-        params.push(JSON.stringify(colors));
-    }
-
+    if (colors !== undefined) { updates.push("colors = ?"); params.push(JSON.stringify(colors)); }
     if (password) { updates.push("password = ?"); params.push(bcrypt.hashSync(password, 8)); }
 
     if (updates.length === 0) return res.json({ message: "Rien à modifier" });
@@ -175,20 +160,18 @@ app.put('/api/user/update', authenticateToken, (req, res) => {
     db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
-        // Renvoyer le user mis à jour
         db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id], (err, user) => {
             let prefs = {}; try { prefs = JSON.parse(user.preferences); } catch(e) {}
-            let userColors = {}; try { userColors = JSON.parse(user.colors); } catch(e) {} // Parsing inverse pour le front
+            let userColors = {}; try { userColors = JSON.parse(user.colors); } catch(e) {}
 
-            user.avatar_url = getProfilePhotoUrl(user.avatar_url);
+            // MODIF IMPORTANTE : Pas de getProfilePhotoUrl ici non plus
+            // user.avatar_url = getProfilePhotoUrl(user.avatar_url); <--- SUPPRIMÉ
 
             res.json({ message: "Profil mis à jour", user: { ...user, password: '', preferences: prefs, colors: userColors } });
         });
     });
 });
 
-// ... (Reste du fichier: Avatar, Admin, Trades - pas de changement nécessaire) ...
-// Pour être sûr, les routes Trades, Notifs, etc. doivent être présentes ici comme avant.
 app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "Aucun fichier" });
     const url = `/uploads/${req.file.filename}`;
@@ -198,6 +181,7 @@ app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, r
     });
 });
 
+// ... Routes Trades, Notifications, Admin (inchangées) ...
 app.get('/api/trades', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM trades WHERE user_id = ? ORDER BY date DESC`, [req.user.id], (err, rows) => res.json(rows));
 });
@@ -226,5 +210,9 @@ app.put('/api/notifications/read', authenticateToken, (req, res) => {
 app.get('/api/updates', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM updates ORDER BY date DESC`, [], (err, rows) => res.json(rows));
 });
+
+// Admin Routes (Simplifiées pour la brièveté, assurez-vous qu'elles sont là)
+app.get('/api/admin/users', authenticateToken, (req, res) => { if(req.user.is_pro!==7) return res.sendStatus(403); db.all("SELECT * FROM users", [], (err, rows) => res.json(rows)); });
+// ... autres routes admin ...
 
 app.listen(PORT, () => console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`));
