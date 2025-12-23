@@ -53,24 +53,20 @@ function App() {
     const colors = (user?.colors) ? user.colors : DEFAULT_COLORS;
 
     // --- GESTION DU THEME ET META TAGS (Updated) ---
-    // --- SAFE AREA IOS & THEME COLOR ---
     useEffect(() => {
         const root = document.documentElement;
         const metaTheme = document.querySelector('meta[name="theme-color"]');
 
         if (viewMode === 'home' || viewMode === 'auth') {
-            // Mode Accueil : Noir total
             root.style.setProperty('--bg-global', '#000000');
             if (metaTheme) metaTheme.setAttribute('content', '#000000');
         } else {
-            // Mode App
             if (isDark) {
-                // SOMBRE : On force le #262626 (couleur du header mobile)
+                // SOMBRE : #262626 pour Header et Footer
                 root.style.setProperty('--bg-global', '#262626');
                 if (metaTheme) metaTheme.setAttribute('content', '#262626');
             } else {
-                // CLAIR : On force le Blanc pur (#FFFFFF)
-                // Cela assure que la barre d'état et le "rebond" du scroll en haut soient blancs
+                // CLAIR : Blanc pour Header et Footer
                 root.style.setProperty('--bg-global', '#FFFFFF');
                 if (metaTheme) metaTheme.setAttribute('content', '#FFFFFF');
             }
@@ -89,7 +85,6 @@ function App() {
         const token = api.getToken();
         if (savedUser && token) {
             setUser(savedUser);
-            // Gestion de la vue par défaut (Journal ou autre selon préférences/grade)
             if (savedUser.preferences?.defaultView) {
                 const restrictedTabs = ['calendar', 'graphs'];
                 const hasAccess = savedUser.is_pro >= 1;
@@ -222,7 +217,6 @@ function App() {
         <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col`}>
             <TradingBackground />
 
-            {/* MODALS GLOBAUX */}
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
@@ -238,7 +232,6 @@ function App() {
                     hasNewUpdates={hasNewUpdates}
                     unreadNotifsCount={unreadNotifsCount}
                     onOpenNotif={openNotifModal}
-                    // Note: isDark/toggleTheme retirés d'ici car déplacés en haut à droite
                 />
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -258,7 +251,6 @@ function App() {
                             <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
                                 {avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}
                             </div>
-                            {/* Layout Horizontal pour Mobile */}
                             <div className="flex flex-row items-center gap-2 min-w-0">
                                 <span className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{user?.first_name || 'Trader'}</span>
                                 <div className="flex-shrink-0">{renderMobileBadge()}</div>
@@ -275,9 +267,10 @@ function App() {
                     </header>
 
                     {/* CONTENU PRINCIPAL */}
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black relative">
+                    {/* MODIFICATION ICI : 'pb-24' pour laisser la place à la barre fixe mobile */}
+                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 pb-24 md:pb-8 bg-gray-50 dark:bg-black relative">
 
-                        {/* BOUTON THEME (Desktop Only - Top Right) */}
+                        {/* BOUTON THEME (Desktop Only) */}
                         <div className="absolute top-6 right-8 z-30 hidden md:block">
                             <button
                                 onClick={() => setIsDark(!isDark)}
@@ -293,7 +286,6 @@ function App() {
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                                        {/* CARTE SOLDE DYNAMIQUE */}
                                         <div
                                             className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-300"
                                             style={{
@@ -310,23 +302,15 @@ function App() {
                                     </div>
                                     <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} />
-
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}
                                 </div>
                             )}
 
-                            {/* AUTRES VUES */}
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
-
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
-
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
-
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user.default_risk} currencySymbol={currencySymbol} /></div>}
-
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
-
-                            {/* VUE SETTINGS */}
                             {activeTab === 'settings' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <SettingsView
@@ -341,8 +325,16 @@ function App() {
                         </main>
                     </div>
 
-                    {/* MENU MOBILE (BOTTOM) */}
-                    <div className="pb-[env(safe-area-inset-bottom)] flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
+                    {/* MENU MOBILE (BOTTOM) - FIXE */}
+                    {/* MODIFICATION ICI : fixed bottom-0 left-0 right-0 */}
+                    <div className="
+                        fixed bottom-0 left-0 right-0
+                        pb-[env(safe-area-inset-bottom)]
+                        z-50 md:hidden
+                        bg-white/90 dark:bg-[#262626]/90
+                        backdrop-blur-xl
+                        border-t border-gray-200 dark:border-neutral-800
+                    ">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
