@@ -146,7 +146,7 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
 
             {/* --- HEADER STICKY (CORRIGÉ) --- */}
             <div className={`
-                sticky z-40 flex items-center justify-between mb-8
+                z-40 flex items-center justify-between mb-8
                 /* CORRECTION ICI : On utilise -top-4 (mobile) et -top-8 (pc) pour compenser les marges négatives */
                 -top-4 -mt-4 -mx-4 px-4 py-4 
                 md:-top-8 md:-mt-8 md:-mx-8 md:px-8 md:py-6
