@@ -267,7 +267,7 @@ function App() {
                     </header>
 
                     {/* CONTENU PRINCIPAL */}
-                    {/* MODIFICATION ICI : 'pb-24' pour laisser la place à la barre fixe mobile */}
+                    {/* MODIFICATION ICI : 'pb-24' conservé pour laisser la place à la barre fixe mobile, suppression de padding-bottom spécifique pour l'espace gris */}
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 pb-24 md:pb-8 bg-gray-50 dark:bg-black relative">
 
                         {/* BOUTON THEME (Desktop Only) */}
@@ -326,14 +326,13 @@ function App() {
                     </div>
 
                     {/* MENU MOBILE (BOTTOM) - FIXE */}
-                    {/* MODIFICATION ICI : fixed bottom-0 left-0 right-0 */}
                     <div className="
-                        fixed bottom-0 left-0 right-0
-                        pb-[env(safe-area-inset-bottom)]
+                        fixed bottom-0 left-0 w-full
                         z-50 md:hidden
                         bg-white/90 dark:bg-[#262626]/90
                         backdrop-blur-xl
                         border-t border-gray-200 dark:border-neutral-800
+                        pb-[env(safe-area-inset-bottom)]
                     ">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
