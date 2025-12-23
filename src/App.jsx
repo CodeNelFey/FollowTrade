@@ -20,7 +20,7 @@ import NotificationModal from './components/NotificationModal';
 import Sidebar from './components/Sidebar';
 import MobileMenu from './components/MobileMenu';
 
-// Couleurs par défaut si la BDD est vide ou pas encore chargée
+// Couleurs par défaut
 const DEFAULT_COLORS = {
     balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e'
 };
@@ -49,10 +49,10 @@ function App() {
     const [viewMode, setViewMode] = useState('home');
     const [authInitialState, setAuthInitialState] = useState(false);
 
-    // --- COULEURS ACTIVES ---
+    // --- COULEURS ACTIVES (LA MODIFICATION IMPORTANTE EST ICI) ---
     const colors = (user?.colors) ? user.colors : DEFAULT_COLORS;
 
-    // --- GESTION DU THEME ET META TAGS (Updated) ---
+    // --- GESTION DU THEME ET META TAGS ---
     useEffect(() => {
         const root = document.documentElement;
         const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -62,18 +62,15 @@ function App() {
             if (metaTheme) metaTheme.setAttribute('content', '#000000');
         } else {
             if (isDark) {
-                // SOMBRE : #262626 pour Header et Footer
                 root.style.setProperty('--bg-global', '#262626');
                 if (metaTheme) metaTheme.setAttribute('content', '#262626');
             } else {
-                // CLAIR : Blanc pour Header et Footer
                 root.style.setProperty('--bg-global', '#FFFFFF');
                 if (metaTheme) metaTheme.setAttribute('content', '#FFFFFF');
             }
         }
     }, [viewMode, isDark]);
 
-    // Appliquer la classe 'dark' au HTML pour Tailwind
     useEffect(() => {
         if (isDark) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
@@ -186,7 +183,7 @@ function App() {
         else setShowUpgradeModal(true);
     };
 
-    // Gestion des Trades (CRUD)
+    // Gestion des Trades
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
@@ -208,11 +205,12 @@ function App() {
         return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>;
     };
 
-    // --- RENDU VUES "HORS APP" ---
+    // --- RENDU ---
+
     if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
-    // --- RENDU APP PRINCIPALE ---
+    // RENDU PRINCIPAL AVEC LA STRUCTURE D'ORIGINE (Flex Column)
     return (
         <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col`}>
             <TradingBackground />
@@ -222,8 +220,6 @@ function App() {
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
-
-                {/* SIDEBAR (Desktop) */}
                 <Sidebar
                     user={user}
                     activeTab={activeTab}
@@ -236,17 +232,8 @@ function App() {
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* HEADER (Mobile Only) */}
-                    <header className="
-                        h-[calc(4rem+env(safe-area-inset-top))]
-                        pt-[env(safe-area-inset-top)]
-                        md:hidden
-                        bg-white/80 dark:bg-[#262626]
-                        backdrop-blur-xl
-                        border-b border-gray-200 dark:border-neutral-800
-                        flex items-center justify-between
-                        px-4
-                        z-20">
+                    {/* Header Mobile */}
+                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
                         <div className="flex items-center gap-3 overflow-hidden">
                             <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
                                 {avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}
@@ -266,9 +253,8 @@ function App() {
                         </div>
                     </header>
 
-                    {/* CONTENU PRINCIPAL */}
-                    {/* MODIFICATION ICI : 'pb-24' conservé pour laisser la place à la barre fixe mobile, suppression de padding-bottom spécifique pour l'espace gris */}
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 pb-24 md:pb-8 bg-gray-50 dark:bg-black relative">
+                    {/* CONTENU PRINCIPAL - Structure Flex */}
+                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black relative">
 
                         {/* BOUTON THEME (Desktop Only) */}
                         <div className="absolute top-6 right-8 z-30 hidden md:block">
@@ -282,10 +268,10 @@ function App() {
                         </div>
 
                         <main className="max-w-7xl mx-auto pb-6">
-                            {/* VUE JOURNAL */}
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                        {/* CARTE SOLDE AVEC COULEURS DYNAMIQUES */}
                                         <div
                                             className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-300"
                                             style={{
@@ -302,13 +288,19 @@ function App() {
                                     </div>
                                     <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} />
+                                    {/* Passage des couleurs à TradeHistory */}
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}
                                 </div>
                             )}
 
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
+
+                            {/* Passage des couleurs aux Graphiques */}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
+
+                            {/* Passage des couleurs au Calendrier */}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
+
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user.default_risk} currencySymbol={currencySymbol} /></div>}
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
                             {activeTab === 'settings' && (
@@ -325,15 +317,9 @@ function App() {
                         </main>
                     </div>
 
-                    {/* MENU MOBILE (BOTTOM) - FIXE */}
-                    <div className="
-                        fixed bottom-0 left-0 w-full
-                        z-50 md:hidden
-                        bg-white/90 dark:bg-[#262626]/90
-                        backdrop-blur-xl
-                        border-t border-gray-200 dark:border-neutral-800
-                        pb-[env(safe-area-inset-bottom)]
-                    ">
+                    {/* MENU MOBILE - STRUCTURE D'ORIGINE (Flex-none) */}
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
+                        {/* Passage des couleurs au MobileMenu */}
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
