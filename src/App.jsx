@@ -49,7 +49,7 @@ function App() {
     const [viewMode, setViewMode] = useState('home');
     const [authInitialState, setAuthInitialState] = useState(false);
 
-    // --- COULEURS ACTIVES (LA MODIFICATION IMPORTANTE EST ICI) ---
+    // --- COULEURS ACTIVES ---
     const colors = (user?.colors) ? user.colors : DEFAULT_COLORS;
 
     // --- GESTION DU THEME ET META TAGS ---
@@ -210,7 +210,7 @@ function App() {
     if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
-    // RENDU PRINCIPAL AVEC LA STRUCTURE D'ORIGINE (Flex Column)
+    // RENDU PRINCIPAL
     return (
         <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col`}>
             <TradingBackground />
@@ -232,8 +232,16 @@ function App() {
 
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
-                    {/* Header Mobile */}
-                    <header className="h-16 flex-none md:hidden bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
+                    {/* --- CORRECTION HEADER MOBILE --- */}
+                    {/* Ajout de h-[calc(4rem+env(safe-area-inset-top))] et pt-[env(safe-area-inset-top)] pour pousser le contenu SOUS la barre d'état */}
+                    <header className="
+                        flex-none md:hidden
+                        h-[calc(4rem+env(safe-area-inset-top))]
+                        pt-[env(safe-area-inset-top)]
+                        bg-white/80 dark:bg-[#262626]
+                        backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800
+                        flex items-center justify-between px-4 z-20
+                    ">
                         <div className="flex items-center gap-3 overflow-hidden">
                             <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">
                                 {avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}
@@ -253,7 +261,7 @@ function App() {
                         </div>
                     </header>
 
-                    {/* CONTENU PRINCIPAL - Structure Flex */}
+                    {/* CONTENU PRINCIPAL */}
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black relative">
 
                         {/* BOUTON THEME (Desktop Only) */}
