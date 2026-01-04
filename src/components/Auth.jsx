@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Lock, Mail, LogIn, UserPlus, AlertCircle, User } from 'lucide-react';
 
-const Auth = ({ onLoginSuccess, initialSignUp = false }) => {
+const Auth = ({ onLoginSuccess, initialSignUp }) => {
     const [loading, setLoading] = useState(false);
     // On initialise l'état avec la prop reçue
     const [isSignUp, setIsSignUp] = useState(initialSignUp);
-    const [error, setError] = useState(null);
-
+    const [error, setError] = useState(''); // Assurez-vous d'avoir un state pour les erreurs/messages
     // Champs du formulaire
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -57,6 +56,15 @@ const Auth = ({ onLoginSuccess, initialSignUp = false }) => {
     };
 
     const inputClass = "w-full bg-white/50 dark:bg-neutral-950/50 border border-gray-200 dark:border-neutral-800 text-gray-900 dark:text-white px-4 py-3 pl-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-gray-400";
+
+    useEffect(() => {
+        // VÉRIFICATION MESSAGE D'EXPIRATION
+        const sessionMsg = localStorage.getItem('auth_message');
+        if (sessionMsg) {
+            setError(sessionMsg); // Affiche le message "Session expirée" dans la zone d'erreur
+            localStorage.removeItem('auth_message'); // On nettoie pour ne pas l'afficher tout le temps
+        }
+    }, []);
 
     return (
         <div className="flex items-center justify-center min-h-[80vh]">

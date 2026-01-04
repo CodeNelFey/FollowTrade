@@ -1,172 +1,106 @@
 // src/api.js
 
-// Détection dynamique de l'IP pour que ça marche sur Mobile ET PC
-const hostname = window.location.hostname; // ex: 'localhost' ou '192.168.1.15'
-
+const hostname = window.location.hostname;
 export const BASE_URL = (hostname === 'localhost' || hostname.startsWith('192.168') || hostname.startsWith('10.'))
-    ? `http://${hostname}:3000` // En dev/réseau local : on utilise l'IP actuelle + port 3000
-    : ''; // En production (ex: Vercel/Render) : URL relative
+    ? `http://${hostname}:3000`
+    : '';
 
 const API_URL = `${BASE_URL}/api`;
 
+// --- FONCTION INTERCEPTEUR ---
+const request = async (endpoint, options = {}) => {
+    const token = localStorage.getItem('token');
+
+    // Configuration des headers par défaut
+    const headers = { ...options.headers };
+
+    // Si ce n'est pas du FormData (upload image), on ajoute le Content-Type JSON
+    if (!(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    // Ajout du Token
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+
+        // --- GESTION DE L'EXPIRATION (C'est ici que la magie opère) ---
+        if (response.status === 401 || response.status === 403) {
+            // Le token est invalide ou expiré
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+
+            // On ajoute un marqueur pour dire à la page de login d'afficher un message
+            localStorage.setItem('auth_message', 'Votre session a expiré. Veuillez vous reconnecter.');
+
+            // On recharge la page pour renvoyer l'utilisateur vers Auth/Home
+            window.location.reload();
+            return Promise.reject("Session expirée");
+        }
+
+        return response.json();
+    } catch (error) {
+        console.error("API Error:", error);
+        throw error;
+    }
+};
+
 export const api = {
-    // --- UTILITAIRE IMAGE ---
     getAvatarUrl: (path) => {
         if (!path) return null;
-
-        // 1. Blob (prévisualisation upload)
-        if (path.startsWith('blob:')) return path;
-
-        // 2. URL absolue déjà complète (ex: Google ou anciennes données)
-        if (path.startsWith('http')) return path;
-
-        // 3. Chemin relatif : on colle la BASE_URL dynamique devant
+        if (path.startsWith('blob:') || path.startsWith('http')) return path;
         return `${BASE_URL}${path}`;
     },
 
-    // ... LE RESTE DU FICHIER NE CHANGE PAS ...
     getToken: () => localStorage.getItem('token'),
     setToken: (token) => localStorage.setItem('token', token),
     removeToken: () => localStorage.removeItem('token'),
 
-    getUser: () => {
-        try { return JSON.parse(localStorage.getItem('user')); } catch(e) { return null; }
-    },
+    getUser: () => { try { return JSON.parse(localStorage.getItem('user')); } catch(e) { return null; } },
     setUser: (user) => localStorage.setItem('user', JSON.stringify(user)),
 
-    login: async (email, password) => {
-        const res = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-        });
-        return res.json();
-    },
-    register: async (email, password, first_name, last_name) => {
-        const res = await fetch(`${API_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, first_name, last_name }),
-        });
-        return res.json();
-    },
-    updateUser: async (userData) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/user/update`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(userData),
-        });
-        return res.json();
-    },
-    uploadAvatar: async (file) => {
-        const token = localStorage.getItem('token');
+    // --- ROUTES ---
+    // Note comment le code est simplifié grâce à la fonction 'request'
+
+    login: (email, password) => request('/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+
+    register: (email, password, first_name, last_name) => request('/register', { method: 'POST', body: JSON.stringify({ email, password, first_name, last_name }) }),
+
+    updateUser: (data) => request('/user/update', { method: 'PUT', body: JSON.stringify(data) }),
+
+    // Pour l'upload, on passe le FormData directement, 'request' gérera les headers
+    uploadAvatar: (formData) => request('/user/avatar', { method: 'POST', body: formData }),
+
+    // COMPTES
+    getAccounts: () => request('/accounts'),
+    createAccount: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    updateAccount: (id, data) => request('/accounts/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteAccount: (id) => request('/accounts/' + id, { method: 'DELETE' }),
+
+    // TRADES
+    getTrades: (accountId) => request(`/trades?accountId=${accountId}`),
+    addTrade: (trade) => request('/trades', { method: 'POST', body: JSON.stringify(trade) }),
+    updateTrade: (id, trade) => request(`/trades/${id}`, { method: 'PUT', body: JSON.stringify(trade) }),
+    deleteTrade: (id) => request(`/trades/${id}`, { method: 'DELETE' }),
+
+    // SCANNER (Exemple spécifique avec FormData)
+    scanTradeImage: (file) => {
         const formData = new FormData();
-        formData.append('avatar', file);
-        const res = await fetch(`${API_URL}/user/avatar`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData,
-        });
-        return res.json();
+        formData.append('image', file);
+        return request('/scan-trade', { method: 'POST', body: formData });
     },
-    adminGetAllUsers: async () => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
-        return res.json();
-    },
-    adminUpdateUser: async (id, data) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/users/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(data),
-        });
-        return res.json();
-    },
-    adminDeleteUser: async (id) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/users/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        return res.json();
-    },
-    getUpdates: async () => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/updates`, { headers: { 'Authorization': `Bearer ${token}` } });
-        return res.json();
-    },
-    adminCreateUpdate: async (data) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/updates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(data),
-        });
-        return res.json();
-    },
-    adminUpdateUpdate: async (id, data) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/updates/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(data),
-        });
-        return res.json();
-    },
-    adminDeleteUpdate: async (id) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/admin/updates/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        return res.json();
-    },
-    getNotifications: async () => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/notifications`, { headers: { 'Authorization': `Bearer ${token}` } });
-        return res.json();
-    },
-    markSingleNotificationRead: async (id) => {
-        const token = localStorage.getItem('token');
-        await fetch(`${API_URL}/notifications/read/${id}`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-    },
-    markNotificationsRead: async () => {
-        const token = localStorage.getItem('token');
-        await fetch(`${API_URL}/notifications/read`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-    },
-    getTrades: async () => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/trades`, { headers: { 'Authorization': `Bearer ${token}` } });
-        return res.json();
-    },
-    addTrade: async (trade) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/trades`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(trade),
-        });
-        return res.json();
-    },
-    updateTrade: async (id, trade) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/trades/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(trade),
-        });
-        return res.json();
-    },
-    deleteTrade: async (id) => {
-        const token = localStorage.getItem('token');
-        await fetch(`${API_URL}/trades/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-    }
+
+    // AUTRES
+    getNotifications: () => request('/notifications'),
+    markSingleNotificationRead: (id) => request(`/notifications/read/${id}`, { method: 'PUT' }),
+    markNotificationsRead: () => request('/notifications/read', { method: 'PUT' }),
+    getUpdates: () => request('/updates'),
+
+    // ADMIN
+    adminGetAllUsers: () => request('/admin/users'),
+    adminUpdateUser: (id, data) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' })
 };
