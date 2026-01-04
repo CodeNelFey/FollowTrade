@@ -90,7 +90,7 @@ function App() {
         }
     }, []);
 
-    // --- LOGIQUE METIER & OCR (INTEGRÉE DANS APP) ---
+    // --- LOGIQUE METIER & OCR ---
 
     const getContractSize = (pairCode) => {
         const pairInfo = PAIRS.find(p => p.code === pairCode);
@@ -115,7 +115,6 @@ function App() {
         } catch (e) { return null; }
     };
 
-    // --- PARSER OCR ---
     const parseMT5Data = (text) => {
         const extracted = { fees: 0 };
         const cleanText = text.replace(/->|→|>/g, ' ').toUpperCase();
@@ -140,25 +139,16 @@ function App() {
 
         const relevantLines = lines.slice(mainLineIndex + 1, mainLineIndex + 15);
         for (const line of relevantLines) {
-
-            // DATE
-            if (!extracted.date) {
-                const d = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})/);
-                if (d) extracted.date = `${d[1]}-${d[2]}-${d[3]}`;
-            }
-
-            // SL / TP
+            if (!extracted.date) { const d = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})/); if (d) extracted.date = `${d[1]}-${d[2]}-${d[3]}`; }
             if (!extracted.sl) { const sl = line.match(/(?:S|5)[\s\/\\I\|\.]*L[:\s]*([\d\.]+)/); if (sl) extracted.sl = sl[1]; }
             if (!extracted.tp) { const tp = line.match(/T[\s\/\\I\|\.]*P[:\s]*([\d\.]+)/); if (tp) extracted.tp = tp[1]; }
 
-            // CHARGES / SWAP
             const chargesMatch = line.match(/(?:CHARGES|COMMISSION|C\s*H\s*A\s*R\s*G\s*E\s*S)[:\s]*([-]?[\d\.]+)/);
             if (chargesMatch) extracted.fees += Math.abs(parseFloat(chargesMatch[1]));
 
             const swapMatch = line.match(/(?:SWAP|S\s*W\s*A\s*P)[:\s]*([-]?[\d\.]+)/);
             if (swapMatch) extracted.fees += Math.abs(parseFloat(swapMatch[1]));
 
-            // PRIX ET PROFIT
             if (!extracted.entry && !line.includes(extracted.date)) {
                 if (line.match(/(?:S|5)[\s\/\\I\|\.]*L/) || line.match(/T[\s\/\\I\|\.]*P/)) continue;
                 if (line.match(/(?:CHARGES|COMMISSION|SWAP)/)) continue;
@@ -170,7 +160,6 @@ function App() {
                 }
             }
         }
-
         if (parseFloat(extracted.sl) === 0) extracted.sl = '';
         if (parseFloat(extracted.tp) === 0) extracted.tp = '';
         return extracted;
@@ -192,14 +181,13 @@ function App() {
                 finalProfit = parseFloat(data.profit);
             } else {
                 if (!data.entry || !data.exit) throw new Error("Prix manquants.");
-
                 const entry = parseFloat(data.entry);
                 const exit = parseFloat(data.exit);
                 const lot = parseFloat(data.lot);
                 const diff = data.type === 'BUY' ? (exit - entry) : (entry - exit);
                 const contractSize = getContractSize(data.pair);
-
                 let grossProfitQuote = diff * lot * contractSize;
+
                 let quoteCurrency = 'USD';
                 if (data.pair.length === 6) quoteCurrency = data.pair.substring(3);
                 else if (['XAUUSD','US30','BTCUSD'].includes(data.pair)) quoteCurrency = 'USD';
@@ -293,93 +281,24 @@ function App() {
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
 
     return (
-        <div
-            className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col relative`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-        >
+        <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col relative`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
             <TradingBackground />
-
-            {isDragging && (
-                <div className="absolute inset-0 z-[100] bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">
-                    {user?.is_pro >= 1 ? (
-                        <>
-                            <UploadCloud size={80} className="text-white mb-4 animate-bounce" />
-                            <h2 className="text-3xl font-black text-white">Relâchez pour ajouter !</h2>
-                            <p className="text-indigo-100 mt-2">Scan automatique du profit, prix et dates</p>
-                        </>
-                    ) : (
-                        <>
-                            <Crown size={80} className="text-amber-400 mb-4 animate-pulse" />
-                            <h2 className="text-3xl font-black text-white">Fonctionnalité Premium</h2>
-                            <p className="text-indigo-100 mt-2">Passez PRO pour débloquer le scan automatique</p>
-                        </>
-                    )}
-                </div>
-            )}
-
-            {isProcessingFile && (
-                <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-50 rounded-full animate-pulse"></div>
-                        <Loader2 size={64} className="text-white animate-spin relative z-10" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-white mt-6">Lecture de l'image...</h2>
-                    <p className="text-gray-400 mt-2">Récupération du profit réel affiché</p>
-                </div>
-            )}
-
+            {isDragging && (<div className="absolute inset-0 z-[100] bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">{user?.is_pro >= 1 ? (<><UploadCloud size={80} className="text-white mb-4 animate-bounce" /><h2 className="text-3xl font-black text-white">Relâchez pour ajouter !</h2><p className="text-indigo-100 mt-2">Scan automatique du profit, prix et dates</p></>) : (<><Crown size={80} className="text-amber-400 mb-4 animate-pulse" /><h2 className="text-3xl font-black text-white">Fonctionnalité Premium</h2><p className="text-indigo-100 mt-2">Passez PRO pour débloquer le scan automatique</p></>)}</div>)}
+            {isProcessingFile && (<div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300"><div className="relative"><div className="absolute inset-0 bg-indigo-500 blur-xl opacity-50 rounded-full animate-pulse"></div><Loader2 size={64} className="text-white animate-spin relative z-10" /></div><h2 className="text-2xl font-bold text-white mt-6">Lecture de l'image...</h2><p className="text-gray-400 mt-2">Récupération du profit réel affiché</p></div>)}
             <AccountFormModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} onSave={handleSaveAccount} accountToEdit={editingAccount} />
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
-
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
                 <Sidebar user={user} activeTab={activeTab} onNavClick={handleNavClick} onLogout={handleLogout} hasNewUpdates={hasNewUpdates} unreadNotifsCount={unreadNotifsCount} onOpenNotif={openNotifModal} />
-
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                    {/* Header Mobile sans le pb-[env] gênant */}
-                    <header className="flex-none md:hidden h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20">
-                        <div className="flex items-center gap-3 overflow-hidden"><div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">{avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}</div><div className="flex flex-row items-center gap-2 min-w-0"><span className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{user?.first_name || 'Trader'}</span><div className="flex-shrink-0">{renderMobileBadge()}</div></div></div>
-                        <div className="flex items-center gap-2 flex-shrink-0"><button onClick={openNotifModal} className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors"><Bell size={20} className={unreadNotifsCount > 0 ? "text-indigo-500" : ""} />{unreadNotifsCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#262626]"></span>}</button><button onClick={() => handleNavClick('settings')} className="p-2 text-gray-500 hover:text-indigo-500 dark:text-gray-400 transition-colors"><Settings size={20} /></button><button onClick={() => setIsDark(!isDark)} className="p-2 text-gray-500 dark:text-gray-400">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div>
-                    </header>
-
+                    <header className="flex-none md:hidden h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20"><div className="flex items-center gap-3 overflow-hidden"><div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">{avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}</div><div className="flex flex-row items-center gap-2 min-w-0"><span className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{user?.first_name || 'Trader'}</span><div className="flex-shrink-0">{renderMobileBadge()}</div></div></div><div className="flex items-center gap-2 flex-shrink-0"><button onClick={openNotifModal} className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors"><Bell size={20} className={unreadNotifsCount > 0 ? "text-indigo-500" : ""} />{unreadNotifsCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#262626]"></span>}</button><button onClick={() => handleNavClick('settings')} className="p-2 text-gray-500 hover:text-indigo-500 dark:text-gray-400 transition-colors"><Settings size={20} /></button><button onClick={() => setIsDark(!isDark)} className="p-2 text-gray-500 dark:text-gray-400">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div></header>
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black relative">
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
-
                         <main className="max-w-7xl mx-auto pb-6">
-                            <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                                <AccountSelector accounts={accounts} currentAccount={currentAccount} onSelect={setCurrentAccount} onCreate={handleCreateAccount} onUpdate={handleUpdateAccount} onDelete={handleDeleteAccount} onOpenCreate={handleOpenCreateAccount} onOpenEdit={handleOpenEditAccount} />
-                            </div>
-
-                            {activeTab === 'journal' && (
-                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                                        <div className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-500" style={{ background: `linear-gradient(135deg, ${activeColor}, #000000)`, boxShadow: `0 15px 50px -10px ${activeColor}50, 0 5px 2px -10px ${activeColor}10` }}>
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                                            <div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-2 text-xs opacity-60 font-medium uppercase tracking-widest truncate">{currentAccount?.broker || 'No Broker'} • {currentAccount?.name}</div></div>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
-
-                                    <TradeForm
-                                        isOpen={isModalOpen}
-                                        onClose={handleCloseModal}
-                                        onAddTrade={addTrade}
-                                        onUpdateTrade={updateTrade}
-                                        tradeToEdit={editingTrade}
-                                        currencySymbol={currencySymbol}
-                                        currentAccount={currentAccount}
-                                        user={user}
-                                        onShowUpgrade={() => setShowUpgradeModal(true)}
-                                        currentBalance={currentBalance}
-                                    />
-
-                                    {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}
-                                </div>
-                            )}
-
+                            <div className="animate-in fade-in slide-in-from-top-4 duration-500"><AccountSelector accounts={accounts} currentAccount={currentAccount} onSelect={setCurrentAccount} onCreate={handleCreateAccount} onUpdate={handleUpdateAccount} onDelete={handleDeleteAccount} onOpenCreate={handleOpenCreateAccount} onOpenEdit={handleOpenEditAccount} /></div>
+                            {activeTab === 'journal' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6"><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-300" style={{ background: `linear-gradient(135deg, ${colors.balance}, #000000)`, boxShadow: `0 15px 50px -10px ${colors.balance}50, 0 5px 2px -10px ${colors.balance}10` }}><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div><div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
+                                <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} currentAccount={currentAccount} user={user} onShowUpgrade={() => setShowUpgradeModal(true)} currentBalance={currentBalance} />{loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}</div>)}
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
@@ -388,9 +307,8 @@ function App() {
                             {activeTab === 'settings' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>)}
                         </main>
                     </div>
-
-                    {/* Correction du menu mobile: Suppression du padding bas spécifique */}
-                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]">
+                    {/* MENU MOBILE CORRIGÉ (Flex-none seulement) */}
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
