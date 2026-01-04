@@ -75,12 +75,17 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // --- LOGIQUE METIER (Calcul) ---
+    // --- LOGIQUE METIER ---
+
     const getContractSize = (pairCode) => {
         const pairInfo = PAIRS.find(p => p.code === pairCode);
         const type = pairInfo ? pairInfo.type : 'FOREX';
         switch (type) {
-            case 'FOREX': return 100000; case 'METAL': return 100; case 'INDICE': return 1; case 'CRYPTO': return 1; default: return 100000;
+            case 'FOREX': return 100000;
+            case 'METAL': return 100;
+            case 'INDICE': return 1;
+            case 'CRYPTO': return 1;
+            default: return 100000;
         }
     };
 
@@ -100,7 +105,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
     };
 
     const calculateProfit = async (entryPrice, exitPrice, lotSize, pairCode, tradeType, manualFees = null) => {
-        // NOTE: Si le profit a été rempli par le scan, on ne recalcule PAS.
         const entry = parseFloat(entryPrice);
         const exit = parseFloat(exitPrice);
         const lot = parseFloat(lotSize);
@@ -164,19 +168,17 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
 
     useEffect(() => {
         if (!autoCalculate || mode !== 'trade') return;
-
         const { entry, exit, lot, pair, type, fees } = formData;
         const timer = setTimeout(() => {
             if (entry && exit && lot && pair) {
                 calculateProfit(entry, exit, lot, pair, type, fees);
             }
         }, 500);
-
         return () => clearTimeout(timer);
     }, [formData.entry, formData.exit, formData.lot, formData.pair, formData.type, formData.fees, autoCalculate]);
 
 
-    // --- OCR (PARSER CORRIGÉ) ---
+    // --- OCR INTELLIGENT ---
     const parseMT5Data = (text) => {
         const extracted = { fees: '' };
         const cleanText = text.replace(/->|→|>/g, ' ').toUpperCase();
@@ -205,32 +207,19 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
             if (!extracted.sl) { const sl = line.match(/(?:S|5)[\s\/\\I\|\.]*L[:\s]*([\d\.]+)/); if (sl) extracted.sl = sl[1]; }
             if (!extracted.tp) { const tp = line.match(/T[\s\/\\I\|\.]*P[:\s]*([\d\.]+)/); if (tp) extracted.tp = tp[1]; }
 
-            // CHARGES / SWAP (OCR)
-            const chargesMatch = line.match(/(?:CHARGES|SWAP|COMMISSION|FEES|S\s?W\s?A\s?P)[:\s]*([-]?[\d\.]+)/);
+            const chargesMatch = line.match(/(?:CHARGES|SWAP|COMM|FEES)[:\s]*([-]?[\d\.]+)/);
             if (chargesMatch) {
                 const currentFees = parseFloat(extracted.fees) || 0;
                 extracted.fees = (currentFees + Math.abs(parseFloat(chargesMatch[1]))).toFixed(2);
             }
 
-            // PRIX ET PROFIT
             if (!extracted.entry && !line.includes(extracted.date)) {
                 if (line.match(/(?:S|5)[\s\/\\I\|\.]*L/) || line.match(/T[\s\/\\I\|\.]*P/)) continue;
-                if (line.match(/(?:CHARGES|SWAP|COMMISSION|FEES)/)) continue;
-
-                // Recherche de tous les nombres
+                if (line.match(/(?:CHARGES|SWAP|COMM|FEES)/)) continue;
                 const nums = line.match(/([-]?\d+\.\d{2,})/g);
                 if (nums) {
-                    // SI 3 NOMBRES = ENTREE, SORTIE, PROFIT
-                    if (nums.length >= 3) {
-                        extracted.entry = nums[0];
-                        extracted.exit = nums[1];
-                        extracted.profit = nums[2];
-                    }
-                    // SI 2 NOMBRES = ENTREE, SORTIE
-                    else if (nums.length === 2) {
-                        extracted.entry = nums[0];
-                        extracted.exit = nums[1];
-                    }
+                    if (nums.length >= 3) { extracted.entry = nums[0]; extracted.exit = nums[1]; extracted.profit = nums[2]; }
+                    else if (nums.length === 2) { extracted.entry = nums[0]; extracted.exit = nums[1]; }
                 }
             }
         }
@@ -263,7 +252,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                 profit: data.profit || prev.profit
             }));
 
-            // Si profit scanné, on désactive le calcul. Sinon on calcule.
             if(data.entry && data.exit && !data.profit) {
                 calculateProfit(data.entry, data.exit, data.lot, data.pair, data.type, data.fees);
                 setAutoCalculate(true);
@@ -301,7 +289,8 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
 
     const inputContainerClass = "flex flex-col gap-1 w-full";
     const labelClass = "text-xs font-bold text-gray-700 dark:text-gray-400 uppercase tracking-wider ml-1";
-    const inputClass = "w-full bg-gray-100 dark:bg-neutral-800 border border-transparent focus:border-indigo-500 dark:focus:border-indigo-500 rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400";
+    // Correction CSS : ajout de min-w-0 et appearance-none pour l'input date
+    const inputClass = "w-full bg-gray-100 dark:bg-neutral-800 border border-transparent focus:border-indigo-500 dark:focus:border-indigo-500 rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-w-0 appearance-none";
     const tabClass = (active) => `flex-1 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'}`;
 
     const isPro = user?.is_pro >= 1;
@@ -368,7 +357,7 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                                             {isPairOpen && (<div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-neutral-800 rounded-xl shadow-xl border border-gray-200 dark:border-neutral-700 max-h-40 overflow-y-auto z-10 p-1 w-full">{PAIRS.map((pair) => (<button key={pair.code} type="button" onClick={() => selectPair(pair.code)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-neutral-700 rounded-lg transition-colors group"><img src={`/icons/${pair.code.toLowerCase()}.png`} alt={pair.code} className="w-6 h-6 object-contain flex-shrink-0" onError={(e) => {e.target.style.display='none'}} /><div className="text-left truncate"><div className="font-bold text-gray-900 dark:text-gray-200 text-sm truncate">{pair.code}</div></div>{formData.pair === pair.code && <Check size={16} className="ml-auto text-indigo-500 flex-shrink-0" />}</button>))}</div>)}
                                         </div>
                                     </div>
-                                    <div className={inputContainerClass}><label className={labelClass}>Date</label><div className="relative w-full"><div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"><Calendar size={18} /></div><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} pl-12 cursor-pointer dark:[color-scheme:dark] min-w-0 w-full`} /></div></div>
+                                    <div className={inputContainerClass}><label className={labelClass}>Date</label><div className="relative w-full"><div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"><Calendar size={18} /></div><input type="date" name="date" value={formData.date} onChange={handleChange} className={`${inputClass} pl-10 cursor-pointer dark:[color-scheme:dark] min-w-0 w-full`} /></div></div>
                                     <div className={inputContainerClass}><label className={labelClass}>Direction</label><div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-neutral-800 rounded-xl w-full"><button type="button" onClick={() => setFormData({...formData, type: 'BUY'})} className={`py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'BUY' ? 'bg-white text-blue-600 shadow-sm dark:bg-neutral-700 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>BUY</button><button type="button" onClick={() => setFormData({...formData, type: 'SELL'})} className={`py-2 rounded-lg text-sm font-bold transition-all ${formData.type === 'SELL' ? 'bg-white text-orange-600 shadow-sm dark:bg-neutral-700 dark:text-orange-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>SELL</button></div></div>
                                     <div className={inputContainerClass}><label className={labelClass}>Lot Size</label><input type="number" name="lot" placeholder="0.00" value={formData.lot} onChange={handleChange} className={inputClass} step="0.01" /></div>
                                 </div>
