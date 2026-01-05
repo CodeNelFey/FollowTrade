@@ -341,7 +341,7 @@ function App() {
                         </main>
                     </div>
 
-                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-black border-t border-gray-200 dark:border-white/10 pb-[env(safe-area-inset-bottom)] pt-1 shadow-lg">
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
