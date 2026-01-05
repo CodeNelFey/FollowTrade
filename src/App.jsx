@@ -272,7 +272,20 @@ function App() {
     const renderMobileBadge = () => { if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>; if (user.is_pro === 2) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Sparkles size={10} fill="currentColor" /> VIP</span>; if (user.is_pro === 1) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Crown size={10} fill="currentColor" /> PRO</span>; return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>; };
 
     if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
-    if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8 pt-[calc(2rem+env(safe-area-inset-top))]"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
+
+    // --- AUTH VIEW AVEC PADDING-TOP (SAFE AREA) ---
+    if (viewMode === 'auth') return (
+        <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}>
+            <TradingBackground />
+            <div className="relative z-10 container mx-auto px-4 py-8 pt-[calc(2rem+env(safe-area-inset-top))]">
+                <div className="flex justify-between mb-4">
+                    <button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button>
+                    <button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button>
+                </div>
+                <Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} />
+            </div>
+        </div>
+    );
 
     return (
         <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col relative`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
@@ -292,6 +305,8 @@ function App() {
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                     <header className="flex-none md:hidden h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20"><div className="flex items-center gap-3 overflow-hidden"><div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">{avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}</div><div className="flex flex-row items-center gap-2 min-w-0"><span className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{user?.first_name || 'Trader'}</span><div className="flex-shrink-0">{renderMobileBadge()}</div></div></div><div className="flex items-center gap-2 flex-shrink-0"><button onClick={openNotifModal} className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors"><Bell size={20} className={unreadNotifsCount > 0 ? "text-indigo-500" : ""} />{unreadNotifsCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#262626]"></span>}</button><button onClick={() => handleNavClick('settings')} className="p-2 text-gray-500 hover:text-indigo-500 dark:text-gray-400 transition-colors"><Settings size={20} /></button><button onClick={() => setIsDark(!isDark)} className="p-2 text-gray-500 dark:text-gray-400">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div></header>
 
+                    {/* --- ZONE CONTENU (AVEC PADDING AJUSTÉ) --- */}
+                    {/* On utilise pb-20 pour que le contenu ne soit pas coupé par le menu flottant */}
                     <div className="flex-1 overflow-y-auto scrollbar-hide p-4 pb-20 md:p-8 md:pb-8 bg-gray-50 dark:bg-black relative">
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
 
@@ -321,8 +336,9 @@ function App() {
                         </main>
                     </div>
 
-                    {/* --- MENU MOBILE FIXE (CORRIGÉ : Noir, pas de safe-area padding explicite) --- */}
-                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/90 dark:bg-black/90 backdrop-blur-lg border-t border-gray-200 dark:border-neutral-800 pb-2 pt-2 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
+                    {/* --- MENU MOBILE FIXE --- */}
+                    {/* Utilisation de bg-black et d'une bordure noire pour masquer le vide gris */}
+                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-black border-t border-gray-200 dark:border-white/5 pb-[env(safe-area-inset-bottom)] pt-1 shadow-lg">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
