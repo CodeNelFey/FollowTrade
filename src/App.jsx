@@ -296,18 +296,34 @@ function App() {
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
 
                         <main className="max-w-7xl mx-auto pb-6">
-                            <div className="animate-in fade-in slide-in-from-top-4 duration-500"><AccountSelector accounts={accounts} currentAccount={currentAccount} onSelect={setCurrentAccount} onCreate={handleCreateAccount} onUpdate={handleUpdateAccount} onDelete={handleDeleteAccount} onOpenCreate={handleOpenCreateAccount} onOpenEdit={handleOpenEditAccount} /></div>
+                            {/* PASSER LA PROP isDark ICI */}
+                            {['journal', 'graphs', 'calendar'].includes(activeTab) && (
+                                <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                                    <AccountSelector
+                                        accounts={accounts}
+                                        currentAccount={currentAccount}
+                                        onSelect={setCurrentAccount}
+                                        onCreate={handleCreateAccount}
+                                        onUpdate={handleUpdateAccount}
+                                        onDelete={handleDeleteAccount}
+                                        onOpenCreate={handleOpenCreateAccount}
+                                        onOpenEdit={handleOpenEditAccount}
+                                        isDark={isDark}
+                                    />
+                                </div>
+                            )}
 
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-                                        <div className="col-span-2 lg:col-span-1 rounded-3xl p-5 md:p-6 text-white relative overflow-hidden shadow-lg transition-all" style={{ background: `linear-gradient(135deg, ${activeColor}, #000000)` }}>
+                                        {/* MODIFICATION DU DEGRADE (PLUS DOUX) */}
+                                        <div className="col-span-2 lg:col-span-1 rounded-3xl p-5 md:p-6 text-white relative overflow-hidden shadow-lg transition-all" style={{ background: `linear-gradient(135deg, ${activeColor}, ${isDark ? '#171717' : '#e5e7eb'})` }}>
                                             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
-                                            <div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><Wallet size={16} /> Solde Actuel</div><div className="text-3xl md:text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-1 text-[10px] md:text-xs opacity-60 font-medium truncate">{currentAccount?.name || 'Sélectionnez un compte'}</div></div>
+                                            <div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2 text-xs font-bold uppercase tracking-wider"><Wallet size={16} /> Solde Actuel</div><div className="text-3xl md:text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-1 text-[10px] md:text-xs opacity-60 font-medium truncate">{currentAccount?.name || 'Sélectionnez un compte'}</div></div>
                                         </div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><BrainCircuit size={16} className={avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-indigo-500' : 'text-rose-500')} /><span>Discipline</span></div><div className={`text-xl md:text-3xl font-black ${avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-gray-800 dark:text-white' : 'text-rose-500')}`}>{avgDiscipline}%</div><div className="text-[10px] text-gray-400 font-medium">Moyenne globale</div></div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><Activity size={16} className={totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Gain Total</span></div><div className={`text-xl md:text-3xl font-black ${totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalPnL > 0 ? '+' : ''}{totalPnL.toFixed(2)}<span className="text-sm font-normal text-gray-400 ml-1">{currencySymbol}</span></div><div className="text-[10px] text-gray-400 font-medium">P&L Cumulé</div></div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><TrendingUp size={16} className={totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Croissance</span></div><div className={`text-xl md:text-3xl font-black ${totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalGainPct > 0 ? '+' : ''}{totalGainPct.toFixed(2)}%</div><div className="text-[10px] text-gray-400 font-medium">Sur capital investi</div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><BrainCircuit size={16} className={avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-indigo-500' : 'text-rose-500')} /><span>Discipline</span></div><div className={`text-2xl md:text-3xl font-black ${avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-gray-800 dark:text-white' : 'text-rose-500')}`}>{avgDiscipline}%</div><div className="text-[10px] text-gray-400 font-medium">Moyenne globale</div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><Activity size={16} className={totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Gain Total</span></div><div className={`text-2xl md:text-3xl font-black ${totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalPnL > 0 ? '+' : ''}{totalPnL.toFixed(2)}<span className="text-sm font-normal text-gray-400 ml-1">{currencySymbol}</span></div><div className="text-[10px] text-gray-400 font-medium">P&L Cumulé</div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><TrendingUp size={16} className={totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Croissance</span></div><div className={`text-2xl md:text-3xl font-black ${totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalGainPct > 0 ? '+' : ''}{totalGainPct.toFixed(2)}%</div><div className="text-[10px] text-gray-400 font-medium">Sur capital investi</div></div>
                                     </div>
 
                                     <div className="flex justify-between items-center"><h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95 text-sm md:text-base"><Plus size={18} /> Nouveau Trade</button></div>
@@ -325,10 +341,7 @@ function App() {
                         </main>
                     </div>
 
-                    {/* --- MENU MOBILE FIXE --- */}
-                    {/* MODIFICATION CRITIQUE ICI : bg-white dark:bg-black (OPAQUE) + border-white/10 */}
-                    {/* Cela force le menu à être totalement noir, couvrant la zone safe-area sans effet de transparence parasite. */}
-                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
+                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-black border-t border-gray-200 dark:border-white/10 pb-[env(safe-area-inset-bottom)] pt-1 shadow-lg">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
