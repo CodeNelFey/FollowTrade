@@ -1,52 +1,53 @@
 import React from 'react';
 import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, Crown } from 'lucide-react';
 
-const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
+const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => { // Ajout de la prop 'colors'
 
     // Helper pour le style actif dynamique
     const getActiveStyle = (tab) => {
         if (activeTab === tab) {
             return {
                 color: colors.balance,
-                backgroundColor: `${colors.balance}20` // Transparence légère (20%)
+                backgroundColor: `${colors.balance}25` // Ajoute de la transparence (~15%) à la couleur de balance
             };
         }
         return {};
     };
 
-    const btnClass = (tab) => `flex flex-col items-center justify-center py-2 rounded-xl relative transition-all duration-200 active:scale-95 ${activeTab === tab ? 'font-bold' : 'text-gray-500 dark:text-gray-400'}`;
+    const btnClass = (tab) => `flex flex-col items-center justify-center p-2 rounded-xl relative transition-all ${activeTab === tab ? 'font-bold' : 'text-gray-400'}`;
 
     return (
-        // MODIFICATION : Plus de bg-..., plus de border-..., juste la grille pure.
-        <div className="grid grid-cols-5 gap-1 w-full max-w-md mx-auto p-2">
+        <div className="md:hidden bg-white dark:bg-[#262626] border-t border-gray-200 dark:border-neutral-800 p-2 grid grid-cols-5 gap-1">
 
             <button
                 onClick={() => onNavClick('journal')}
                 className={btnClass('journal')}
                 style={getActiveStyle('journal')}
             >
-                <LayoutDashboard size={22} />
-                <span className="text-[10px] mt-1">Journal</span>
+                <LayoutDashboard size={20} />
+                <span className="text-[9px] mt-1">Journal</span>
             </button>
 
+            {/* ANALYSES + Couronne */}
             <button
                 onClick={() => onNavClick('graphs')}
                 className={btnClass('graphs')}
                 style={getActiveStyle('graphs')}
             >
-                <LineChart size={22} />
-                <span className="text-[10px] mt-1">Analyses</span>
-                {user.is_pro === 0 && <div className="absolute top-1 right-2 text-yellow-500"><Crown size={8} fill="currentColor" /></div>}
+                <LineChart size={20} />
+                <span className="text-[9px] mt-1">Analyses</span>
+                {user.is_pro === 0 && <div className="absolute top-1 right-2 text-yellow-500"><Crown size={10} fill="currentColor" /></div>}
             </button>
 
+            {/* CALENDRIER + Couronne */}
             <button
                 onClick={() => onNavClick('calendar')}
                 className={btnClass('calendar')}
                 style={getActiveStyle('calendar')}
             >
-                <CalendarIcon size={22} />
-                <span className="text-[10px] mt-1">Agenda</span>
-                {user.is_pro === 0 && <div className="absolute top-1 right-2 text-yellow-500"><Crown size={8} fill="currentColor" /></div>}
+                <CalendarIcon size={20} />
+                <span className="text-[9px] mt-1">Calendrier</span>
+                {user.is_pro === 0 && <div className="absolute top-1 right-2 text-yellow-500"><Crown size={10} fill="currentColor" /></div>}
             </button>
 
             <button
@@ -54,8 +55,8 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
                 className={btnClass('calculator')}
                 style={getActiveStyle('calculator')}
             >
-                <Calculator size={22} />
-                <span className="text-[10px] mt-1">Calc</span>
+                <Calculator size={20} />
+                <span className="text-[9px] mt-1">Calc</span>
             </button>
 
             <button
@@ -63,9 +64,9 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
                 className={btnClass('updates')}
                 style={getActiveStyle('updates')}
             >
-                <Megaphone size={22} />
-                <span className="text-[10px] mt-1">News</span>
-                {hasNewUpdates && <span className="absolute top-2 right-4 bg-red-500 w-1.5 h-1.5 rounded-full animate-pulse"></span>}
+                <Megaphone size={20} />
+                <span className="text-[9px] mt-1">News</span>
+                {hasNewUpdates && <span className="absolute top-1 right-3 bg-red-500 w-2 h-2 rounded-full animate-pulse"></span>}
             </button>
         </div>
     );

@@ -328,7 +328,7 @@ function App() {
                     {/* --- MENU MOBILE FIXE --- */}
                     {/* MODIFICATION CRITIQUE ICI : bg-white dark:bg-black (OPAQUE) + border-white/10 */}
                     {/* Cela force le menu à être totalement noir, couvrant la zone safe-area sans effet de transparence parasite. */}
-                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-black border-t border-gray-200 dark:border-white/10 pb-[env(safe-area-inset-bottom)] pt-1 shadow-lg">
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
                 </div>
