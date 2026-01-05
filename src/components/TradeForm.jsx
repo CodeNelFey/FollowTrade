@@ -35,12 +35,11 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
 
     const dropdownRef = useRef(null);
 
-    // --- CORRECTION : FONCTION POUR NETTOYER LES TAGS ---
     const formatTags = (value) => {
         if (!value) return '';
-        if (Array.isArray(value)) return value.join(', '); // Transforme ['Tag1', 'Tag2'] en "Tag1, Tag2"
-        if (typeof value === 'object') return ''; // Empêche le [object Object]
-        return value; // Retourne la chaîne normale
+        if (Array.isArray(value)) return value.join(', ');
+        if (typeof value === 'object') return '';
+        return value;
     };
 
     // --- INITIALISATION ---
@@ -57,7 +56,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                 setMode('trade');
                 setFormData({
                     ...tradeToEdit,
-                    // Utilisation du formatTags ici pour éviter le bug d'affichage
                     tags: formatTags(tradeToEdit.tags),
                     hasScreenshot: tradeToEdit.hasScreenshot || false,
                     fees: tradeToEdit.fees || ''
@@ -65,7 +63,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                 setAutoCalculate(false);
             }
         } else {
-            // Reset pour nouveau trade
             setMode('trade');
             setFormData({
                 pair: '', date: new Date().toISOString().split('T')[0], time: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}),
@@ -90,10 +87,142 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // ... (Le reste des calculs LIVE, OCR, etc. reste identique et fonctionnel) ...
-    // JE NE MODIFIE QUE LA SOUMISSION POUR GÉRER LES TAGS COMME IL FAUT
+    // --- LOGIQUE OCR / PARSING MT5 (Ajoutée) ---
+    const parseMT5Data = (text) => {
+        const extracted = { fees: 0, time: '' };
+        // Nettoyage de base
+        const cleanText = text.replace(/->|→|>/g, ' ').toUpperCase();
+        const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
 
-    // --- CALCULS LIVE ---
+        let mainLineIndex = -1;
+
+        // 1. Trouver la ligne principale (BUY/SELL)
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            // Regex qui cherche BUY ou SELL suivi d'un chiffre (le lot)
+            if (line.match(/(BUY|SELL)\s+\d/)) {
+                if (PAIRS.some(p => line.includes(p.code)) || line.match(/[A-Z]{6}/)) {
+                    mainLineIndex = i;
+                    const foundPair = PAIRS.find(p => line.includes(p.code));
+                    extracted.pair = foundPair ? foundPair.code : line.match(/\b([A-Z]{6})\b/)[1];
+
+                    const typeLotMatch = line.match(/(BUY|SELL)\s+([0-9\.]+)/);
+                    if (typeLotMatch) {
+                        extracted.type = typeLotMatch[1];
+                        extracted.lot = typeLotMatch[2];
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (mainLineIndex === -1) return extracted;
+
+        // 2. Analyser les lignes autour (Date, SL, TP, Fees, Profit)
+        // On regarde les 15 lignes suivantes (ou jusqu'à la fin)
+        const relevantLines = lines.slice(mainLineIndex + 1, mainLineIndex + 15);
+
+        for (const line of relevantLines) {
+            // Date & Heure
+            if (!extracted.date) {
+                const dateTimeMatch = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})\s+(\d{2})[:\.](\d{2})(?:[:\.](\d{2}))?/);
+                if (dateTimeMatch) {
+                    extracted.date = `${dateTimeMatch[1]}-${dateTimeMatch[2]}-${dateTimeMatch[3]}`;
+                    extracted.time = `${dateTimeMatch[4]}:${dateTimeMatch[5]}`;
+                } else {
+                    const d = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})/);
+                    if (d) extracted.date = `${d[1]}-${d[2]}-${d[3]}`;
+                }
+            }
+
+            // SL / TP
+            if (!extracted.sl) { const sl = line.match(/(?:S|5)[\s\/\\I\|\.]*L[:\s]*([\d\.]+)/); if (sl) extracted.sl = sl[1]; }
+            if (!extracted.tp) { const tp = line.match(/T[\s\/\\I\|\.]*P[:\s]*([\d\.]+)/); if (tp) extracted.tp = tp[1]; }
+
+            // Frais (Swap / Commission)
+            const chargesMatch = line.match(/(?:CHARGES|COMMISSION|C\s*H\s*A\s*R\s*G\s*E\s*S)[:\s]*([-]?[\d\.]+)/);
+            if (chargesMatch) extracted.fees += Math.abs(parseFloat(chargesMatch[1]));
+
+            const swapMatch = line.match(/(?:SWAP|S\s*W\s*A\s*P)[:\s]*([-]?[\d\.]+)/);
+            if (swapMatch) extracted.fees += Math.abs(parseFloat(swapMatch[1]));
+
+            // Prix (Entry, Exit) & Profit
+            if (!extracted.entry && !line.includes(extracted.date)) {
+                // Ignore les lignes SL/TP/SWAP pour la recherche de prix nus
+                if (line.match(/(?:S|5)[\s\/\\I\|\.]*L/) || line.match(/T[\s\/\\I\|\.]*P/)) continue;
+                if (line.match(/(?:CHARGES|COMMISSION|SWAP)/)) continue;
+
+                if (!extracted.profit) {
+                    const profitLabelMatch = line.match(/PROFIT[:\s]*([-]?[\d\.]+)/);
+                    if (profitLabelMatch) extracted.profit = profitLabelMatch[1];
+                }
+
+                // Cherche une séquence de nombres (ex: 1.08500 -> 1.08600)
+                const nums = line.match(/([-]?\d+\.\d{2,})/g);
+                if (nums) {
+                    if (nums.length >= 3) {
+                        extracted.entry = nums[0];
+                        extracted.exit = nums[1];
+                        extracted.profit = nums[2];
+                    } else if (nums.length === 2) {
+                        extracted.entry = nums[0];
+                        extracted.exit = nums[1];
+                    }
+                }
+            }
+        }
+
+        // Nettoyage final
+        if (parseFloat(extracted.sl) === 0) extracted.sl = '';
+        if (parseFloat(extracted.tp) === 0) extracted.tp = '';
+
+        return extracted;
+    };
+
+    const handleScanImage = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsScanning(true);
+        try {
+            const result = await Tesseract.recognize(file, 'eng');
+            const data = parseMT5Data(result.data.text);
+
+            if (data.pair) {
+                // Mise à jour du formulaire avec les données extraites
+                setFormData(prev => ({
+                    ...prev,
+                    pair: data.pair || prev.pair,
+                    type: data.type || prev.type,
+                    lot: data.lot || prev.lot,
+                    entry: data.entry || prev.entry,
+                    exit: data.exit || prev.exit,
+                    sl: data.sl || prev.sl,
+                    tp: data.tp || prev.tp,
+                    profit: data.profit || prev.profit,
+                    fees: data.fees ? data.fees.toFixed(2) : prev.fees,
+                    date: data.date || prev.date,
+                    time: data.time || prev.time,
+                    // Marquer qu'on a utilisé le scan
+                    hasScreenshot: true,
+                    tags: 'Scan MT5'
+                }));
+                setAutoCalculate(false); // Désactiver le calcul auto pour ne pas écraser le profit lu
+            } else {
+                alert("Impossible de lire les détails du trade. Assurez-vous que l'image est nette.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de la lecture de l'image.");
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleScanClick = () => { if (user?.is_pro >= 1) fileScanRef.current?.click(); else onShowUpgrade(); };
+
+
+    // --- CALCULS LIVE & HELPERS (Existants) ---
     useEffect(() => {
         if (mode !== 'trade') return;
         const entry = parseFloat(formData.entry);
@@ -129,9 +258,7 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         setLiveStats(stats);
     }, [formData.entry, formData.sl, formData.tp, formData.lot, formData.pair, currentAccount, currentBalance]);
 
-    // Helpers pour l'affichage et calculs
     const getContractSize = (pairCode) => { if (!pairCode) return 100000; const p = pairCode.toUpperCase(); if (p.includes('XAU') || p.includes('GOLD')) return 100; if (p.includes('BTC') || p.includes('ETH') || p.includes('US30') || p.includes('NDX')) return 1; if (p.includes('JPY')) return 1000; return 100000; };
-    const getConversionRate = async (from, to) => { if (from === to) return 1; try { let res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${from === 'USD' ? 'USDT' : from}${to === 'USD' ? 'USDT' : to}`); if (res.ok) { const data = await res.json(); return parseFloat(data.price); } return null; } catch (e) { return null; } };
 
     const calculateProfit = async (entryPrice, exitPrice, lotSize, pairCode, tradeType, manualFees = null) => {
         const entry = parseFloat(entryPrice); const exit = parseFloat(exitPrice); const lot = parseFloat(lotSize);
@@ -140,7 +267,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         const contractSize = getContractSize(pairCode);
         let grossProfit = diff * lot * contractSize;
 
-        // Simplification conversion (suppose compte USD pour l'exemple, à adapter si besoin)
         if (pairCode.endsWith('USD')) { /* OK */ }
         else if (pairCode.startsWith('USD')) { grossProfit = grossProfit / exit; }
 
@@ -158,18 +284,8 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         return () => clearTimeout(timer);
     }, [formData.entry, formData.exit, formData.lot, formData.pair, formData.type, formData.fees, autoCalculate]);
 
-    // OCR Logic (Inchangée)
-    const handleScanImage = async (e) => {
-        const file = e.target.files[0]; if (!file) return; setIsScanning(true);
-        try {
-            const result = await Tesseract.recognize(file, 'eng');
-            // ... (Logique OCR simplifiée pour le bloc code)
-            alert("Scan terminé (simulation). Remplissez les champs si nécessaire.");
-        } catch (error) { console.error(error); alert("Erreur lecture."); } finally { setIsScanning(false); }
-    };
-    const handleScanClick = () => { if (user?.is_pro >= 1) fileScanRef.current?.click(); else onShowUpgrade(); };
 
-    // --- SOUMISSION DU FORMULAIRE ---
+    // --- SOUMISSION ---
     const handleSubmit = (e) => {
         e.preventDefault();
         let finalData = {};
@@ -177,8 +293,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
         if (mode === 'trade') {
             if(!formData.pair || !formData.entry) return;
 
-            // 1. On prépare les tags sous forme de tableau pour le calcul du score
-            // L'input contient "Tag1, Tag2", on le split par la virgule
             const tagsArray = typeof formData.tags === 'string'
                 ? formData.tags.split(',').map(t => t.trim()).filter(t => t)
                 : [];
@@ -186,12 +300,8 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
             const dataForScore = { ...formData, tags: tagsArray };
             const discipline = calculateDisciplineScore(dataForScore, currentAccount, currentBalance);
 
-            // 2. On prépare l'objet final pour l'API
-            // Note: On peut envoyer tagsArray, le backend le gère via JSON.stringify ou .toString() implicite
-            // Pour être sûr, on renvoie une string propre séparée par des virgules si le backend attend du TEXT
             finalData = {
                 ...dataForScore,
-                // On remet les tags en string propre pour le stockage TEXT
                 tags: tagsArray.join(', '),
                 disciplineScore: discipline.total,
                 disciplineDetails: discipline.details
@@ -230,12 +340,12 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                 </div>
 
                 <div className="overflow-y-auto p-6 md:p-8 scrollbar-hide">
-                    {/* BOUTON SCANNER (Inchangé) */}
+                    {/* BOUTON SCANNER */}
                     {mode === 'trade' && !tradeToEdit && (
                         <div className="mb-6 relative">
                             <input type="file" ref={fileScanRef} onChange={handleScanImage} accept="image/*" className="hidden" />
                             <button onClick={handleScanClick} disabled={isScanning} className={`w-full py-4 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden ${user?.is_pro >= 1 ? 'border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30' : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/20'}`}>
-                                {isScanning ? (<><Loader2 size={24} className="animate-spin" /><span className="font-bold text-sm">Lecture...</span></>) : (<><Camera size={24} className="group-hover:scale-110 transition-transform" /><div className="text-center"><span className="block font-bold text-sm">Scanner capture MT5</span></div></>)}
+                                {isScanning ? (<><Loader2 size={24} className="animate-spin" /><span className="font-bold text-sm">Lecture de l'image...</span></>) : (<><Camera size={24} className="group-hover:scale-110 transition-transform" /><div className="text-center"><span className="block font-bold text-sm">Scanner capture MT5</span></div></>)}
                             </button>
                         </div>
                     )}
@@ -279,7 +389,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                                         </div>
                                     </div>
 
-                                    {/* INPUT TAGS (TEXTE NORMAL AVEC VIRGULES) */}
                                     <div className={inputContainerClass + " mt-4"}>
                                         <label className={labelClass}>Tags / Stratégie</label>
                                         <input type="text" name="tags" placeholder="Ex: Scalping, News, Gold..." value={formData.tags} onChange={handleChange} className={inputClass} />
@@ -297,7 +406,6 @@ const TradeForm = ({ isOpen, onClose, onAddTrade, onUpdateTrade, tradeToEdit, cu
                                 </div>
                             </>
                         )}
-                        {/* ... (MODE TRANSFER - Identique) ... */}
                         {mode === 'transfer' && (
                             <div className="space-y-6 animate-in fade-in">
                                 <div className="grid grid-cols-2 gap-4"><button type="button" onClick={() => setTransferData({...transferData, type: 'DEPOSIT'})} className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${transferData.type === 'DEPOSIT' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'border-gray-200 dark:border-neutral-700 text-gray-500'}`}><Wallet size={24} /> <span className="font-bold">Dépôt</span></button><button type="button" onClick={() => setTransferData({...transferData, type: 'WITHDRAWAL'})} className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${transferData.type === 'WITHDRAWAL' ? 'border-rose-500 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400' : 'border-gray-200 dark:border-neutral-700 text-gray-500'}`}><ArrowRightLeft size={24} /> <span className="font-bold">Retrait</span></button></div>
