@@ -17,6 +17,7 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
     const btnClass = (tab) => `flex flex-col items-center justify-center py-2 rounded-xl relative transition-all duration-200 active:scale-95 ${activeTab === tab ? 'font-bold' : 'text-gray-500 dark:text-gray-400'}`;
 
     return (
+        // MODIFICATION : Plus de bg-..., plus de border-..., juste la grille pure.
         <div className="grid grid-cols-5 gap-1 w-full max-w-md mx-auto p-2">
 
             <button
