@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { api } from './api';
+import { calculateDisciplineScore } from './utils/discipline';
 
 // --- IMPORTS DES COMPOSANTS ---
 import TradingBackground from './components/TradingBackground';
@@ -91,7 +92,6 @@ function App() {
     }, []);
 
     // --- LOGIQUE METIER & OCR ---
-
     const getContractSize = (pairCode) => {
         const pairInfo = PAIRS.find(p => p.code === pairCode);
         const type = pairInfo ? pairInfo.type : 'FOREX';
@@ -116,10 +116,9 @@ function App() {
     };
 
     const parseMT5Data = (text) => {
-        const extracted = { fees: 0 };
+        const extracted = { fees: 0, time: '' };
         const cleanText = text.replace(/->|→|>/g, ' ').toUpperCase();
         const lines = cleanText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-
         let mainLineIndex = -1;
         for (let i = lines.length - 1; i >= 0; i--) {
             const line = lines[i];
@@ -134,30 +133,26 @@ function App() {
                 }
             }
         }
-
         if (mainLineIndex === -1) return extracted;
-
         const relevantLines = lines.slice(mainLineIndex + 1, mainLineIndex + 15);
         for (const line of relevantLines) {
-            if (!extracted.date) { const d = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})/); if (d) extracted.date = `${d[1]}-${d[2]}-${d[3]}`; }
+            if (!extracted.date) {
+                const dateTimeMatch = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})\s+(\d{2})[:\.](\d{2})(?:[:\.](\d{2}))?/);
+                if (dateTimeMatch) { extracted.date = `${dateTimeMatch[1]}-${dateTimeMatch[2]}-${dateTimeMatch[3]}`; extracted.time = `${dateTimeMatch[4]}:${dateTimeMatch[5]}`; }
+                else { const d = line.match(/(\d{4})[\.-](\d{2})[\.-](\d{2})/); if (d) extracted.date = `${d[1]}-${d[2]}-${d[3]}`; }
+            }
             if (!extracted.sl) { const sl = line.match(/(?:S|5)[\s\/\\I\|\.]*L[:\s]*([\d\.]+)/); if (sl) extracted.sl = sl[1]; }
             if (!extracted.tp) { const tp = line.match(/T[\s\/\\I\|\.]*P[:\s]*([\d\.]+)/); if (tp) extracted.tp = tp[1]; }
-
             const chargesMatch = line.match(/(?:CHARGES|COMMISSION|C\s*H\s*A\s*R\s*G\s*E\s*S)[:\s]*([-]?[\d\.]+)/);
             if (chargesMatch) extracted.fees += Math.abs(parseFloat(chargesMatch[1]));
-
             const swapMatch = line.match(/(?:SWAP|S\s*W\s*A\s*P)[:\s]*([-]?[\d\.]+)/);
             if (swapMatch) extracted.fees += Math.abs(parseFloat(swapMatch[1]));
-
             if (!extracted.entry && !line.includes(extracted.date)) {
                 if (line.match(/(?:S|5)[\s\/\\I\|\.]*L/) || line.match(/T[\s\/\\I\|\.]*P/)) continue;
                 if (line.match(/(?:CHARGES|COMMISSION|SWAP)/)) continue;
-
+                if (!extracted.profit) { const profitLabelMatch = line.match(/PROFIT[:\s]*([-]?[\d\.]+)/); if (profitLabelMatch) extracted.profit = profitLabelMatch[1]; }
                 const nums = line.match(/([-]?\d+\.\d{2,})/g);
-                if (nums) {
-                    if (nums.length >= 3) { extracted.entry = nums[0]; extracted.exit = nums[1]; extracted.profit = nums[2]; }
-                    else if (nums.length === 2) { extracted.entry = nums[0]; extracted.exit = nums[1]; }
-                }
+                if (nums) { if (nums.length >= 3) { extracted.entry = nums[0]; extracted.exit = nums[1]; extracted.profit = nums[2]; } else if (nums.length === 2) { extracted.entry = nums[0]; extracted.exit = nums[1]; } }
             }
         }
         if (parseFloat(extracted.sl) === 0) extracted.sl = '';
@@ -167,79 +162,49 @@ function App() {
 
     const processFileAndAddTrade = async (file) => {
         if (!currentAccount) { alert("Veuillez sélectionner un compte avant d'ajouter un trade."); return; }
-
         setIsProcessingFile(true);
         try {
             const result = await Tesseract.recognize(file, 'eng');
             const data = parseMT5Data(result.data.text);
-
             if (!data.pair) { throw new Error("Données illisibles."); }
-
             let finalProfit = 0;
-
-            if (data.profit) {
-                finalProfit = parseFloat(data.profit);
-            } else {
+            if (data.profit) { finalProfit = parseFloat(data.profit); } else {
                 if (!data.entry || !data.exit) throw new Error("Prix manquants.");
-                const entry = parseFloat(data.entry);
-                const exit = parseFloat(data.exit);
-                const lot = parseFloat(data.lot);
+                const entry = parseFloat(data.entry); const exit = parseFloat(data.exit); const lot = parseFloat(data.lot);
                 const diff = data.type === 'BUY' ? (exit - entry) : (entry - exit);
                 const contractSize = getContractSize(data.pair);
                 let grossProfitQuote = diff * lot * contractSize;
-
                 let quoteCurrency = 'USD';
                 if (data.pair.length === 6) quoteCurrency = data.pair.substring(3);
                 else if (['XAUUSD','US30','BTCUSD'].includes(data.pair)) quoteCurrency = 'USD';
-
                 finalProfit = grossProfitQuote;
-
                 if (currentAccount.currency !== quoteCurrency) {
-                    if (data.pair.startsWith(currentAccount.currency)) {
-                        finalProfit = grossProfitQuote / exit;
-                    } else {
-                        const rate = await getConversionRate(currentAccount.currency, quoteCurrency);
-                        if (rate) finalProfit = grossProfitQuote / rate;
-                    }
+                    if (data.pair.startsWith(currentAccount.currency)) { finalProfit = grossProfitQuote / exit; }
+                    else { const rate = await getConversionRate(currentAccount.currency, quoteCurrency); if (rate) finalProfit = grossProfitQuote / rate; }
                 }
-
-                if (data.fees) {
-                    finalProfit -= parseFloat(data.fees);
-                }
+                if (data.fees) finalProfit -= parseFloat(data.fees);
             }
-
-            const newTrade = {
-                account_id: currentAccount.id,
-                pair: data.pair,
-                type: data.type,
-                lot: data.lot,
-                entry: data.entry || 0,
-                exit: data.exit || 0,
-                sl: data.sl || 0,
-                tp: data.tp || 0,
-                profit: finalProfit.toFixed(2),
-                date: data.date || new Date().toISOString().split('T')[0]
+            const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
+            const tradeForScore = {
+                entry: data.entry, sl: data.sl, lot: data.lot, pair: data.pair, exit: data.exit || 0, tp: data.tp || 0,
+                date: data.date, time: data.time || '12:00', isOffPlan: false, riskRespected: true, slMoved: false, tags: ['DragDrop'], hasScreenshot: true
             };
-
+            const discipline = calculateDisciplineScore(tradeForScore, currentAccount, currentBalance);
+            const newTrade = {
+                account_id: currentAccount.id, pair: data.pair, type: data.type, lot: data.lot,
+                entry: data.entry || 0, exit: data.exit || 0, sl: data.sl || 0, tp: data.tp || 0,
+                profit: finalProfit.toFixed(2), date: data.date || new Date().toISOString().split('T')[0], time: data.time || '',
+                disciplineScore: discipline.total, disciplineDetails: discipline.details
+            };
             const addedTrade = await api.addTrade(newTrade);
             setTrades([addedTrade, ...trades]);
             setTimeout(() => setIsProcessingFile(false), 800);
-
-        } catch (error) {
-            console.error(error);
-            alert("Erreur : " + error.message);
-            setIsProcessingFile(false);
-        }
+        } catch (error) { console.error(error); alert("Erreur : " + error.message); setIsProcessingFile(false); }
     };
 
     const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
     const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (!user || user.is_pro < 1) { setShowUpgradeModal(true); return; }
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) processFileAndAddTrade(e.dataTransfer.files[0]);
-    };
+    const handleDrop = (e) => { e.preventDefault(); setIsDragging(false); if (!user || user.is_pro < 1) { setShowUpgradeModal(true); return; } if (e.dataTransfer.files && e.dataTransfer.files[0]) processFileAndAddTrade(e.dataTransfer.files[0]); };
 
     const loadAccounts = async () => { try { const accs = await api.getAccounts(); setAccounts(accs); if (accs.length > 0) { if (currentAccount) { const updated = accs.find(a => a.id === currentAccount.id); if (updated) setCurrentAccount(updated); else setCurrentAccount(accs[0]); } else { setCurrentAccount(accs[0]); } } } catch (e) { console.error(e); } };
     const loadTrades = async () => { if (!currentAccount) return; setLoadingData(true); try { const data = await api.getTrades(currentAccount.id); setTrades(data); } catch (e) { console.error(e); } finally { setLoadingData(false); } };
@@ -271,11 +236,15 @@ function App() {
     const currencySymbol = getCurrencySymbol(currencyCode);
     const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
     const avatarSrc = user ? api.getAvatarUrl(user.avatar_url) : null;
+
+    // --- ICI LA LIGNE RESTAURÉE QUI CAUSAIT L'ERREUR ---
     const activeColor = currentAccount?.color || DEFAULT_COLORS.balance;
-    const renderMobileBadge = () => { if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>; if (user.is_pro === 2) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Sparkles size={10} fill="currentColor" /> VIP</span>; if (user.is_pro === 1) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Crown size={10} fill="currentColor" /> PRO</span>; return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>; };
+
     const handleOpenCreateAccount = () => { setEditingAccount(null); setIsAccountModalOpen(true); };
     const handleOpenEditAccount = (acc) => { setEditingAccount(acc); setIsAccountModalOpen(true); };
     const handleSaveAccount = async (formData) => { try { if (editingAccount) { await api.updateAccount(editingAccount.id, formData); } else { await api.createAccount(formData); } await loadAccounts(); setIsAccountModalOpen(false); } catch (e) { alert("Erreur sauvegarde"); } };
+
+    const renderMobileBadge = () => { if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>; if (user.is_pro === 2) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Sparkles size={10} fill="currentColor" /> VIP</span>; if (user.is_pro === 1) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Crown size={10} fill="currentColor" /> PRO</span>; return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>; };
 
     if (viewMode === 'home') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><Home onNavigateToAuth={navigateToAuth} /></div>;
     if (viewMode === 'auth') return <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'dark' : ''}`}><TradingBackground /><div className="relative z-10 container mx-auto px-4 py-8"><div className="flex justify-between mb-4"><button onClick={() => setViewMode('home')} className="text-white/70 hover:text-white font-bold flex items-center gap-2">← Retour</button><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-white/20">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div><Auth onLoginSuccess={handleLoginSuccess} initialSignUp={authInitialState} /></div></div>;
@@ -297,7 +266,7 @@ function App() {
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
                         <main className="max-w-7xl mx-auto pb-6">
                             <div className="animate-in fade-in slide-in-from-top-4 duration-500"><AccountSelector accounts={accounts} currentAccount={currentAccount} onSelect={setCurrentAccount} onCreate={handleCreateAccount} onUpdate={handleUpdateAccount} onDelete={handleDeleteAccount} onOpenCreate={handleOpenCreateAccount} onOpenEdit={handleOpenEditAccount} /></div>
-                            {activeTab === 'journal' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6"><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-300" style={{ background: `linear-gradient(135deg, ${colors.balance}, #000000)`, boxShadow: `0 15px 50px -10px ${colors.balance}50, 0 5px 2px -10px ${colors.balance}10` }}><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div><div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
+                            {activeTab === 'journal' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6"><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"><div className="rounded-3xl p-6 text-white relative overflow-hidden transition-all duration-300" style={{ background: `linear-gradient(135deg, ${activeColor}, #000000)`, boxShadow: `0 15px 50px -10px ${activeColor}50, 0 5px 2px -10px ${activeColor}10` }}><div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2"><Wallet size={18} /> Solde Actuel</div><div className="text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div></div></div></div><div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
                                 <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} currentAccount={currentAccount} user={user} onShowUpgrade={() => setShowUpgradeModal(true)} currentBalance={currentBalance} />{loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}</div>)}
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
@@ -307,10 +276,7 @@ function App() {
                             {activeTab === 'settings' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>)}
                         </main>
                     </div>
-                    {/* MENU MOBILE CORRIGÉ (Flex-none seulement) */}
-                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800">
-                        <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
-                    </div>
+                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"><MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} /></div>
                 </div>
             </div>
         </div>

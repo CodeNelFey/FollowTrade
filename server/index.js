@@ -13,12 +13,9 @@ const PORT = 3000;
 const SECRET_KEY = process.env.SECRET_KEY || "super_secret_cle";
 
 app.use(cors());
-
-// Augmentation de la limite pour les images
 app.use(express.json({ limit: '150mb' }));
 app.use(express.urlencoded({ limit: '150mb', extended: true }));
 
-// --- MULTER ---
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
@@ -29,86 +26,71 @@ const storage = multer.diskStorage({
         cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
-
 const upload = multer({ storage: storage });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- DATABASE ---
 const db = new sqlite3.Database('./journal.db', (err) => {
     if (err) console.error(err.message);
     console.log('✅ Connecté à SQLite.');
 });
 
-// Helper migration
-const addColumnIfNotExists = (tableName, columnName, columnDefinition) => {
-    db.all(`PRAGMA table_info(${tableName})`, (err, rows) => {
-        if (err || !rows) return;
-        if (!rows.some(row => row.name === columnName)) {
-            db.run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`);
-            console.log(`Colonne ${columnName} ajoutée à ${tableName}`);
-        }
+// --- MIGRATION ROBUSTE ---
+const ensureColumns = () => {
+    const columnsToAdd = [
+        // Table, Colonne, Définition
+        ['users', 'first_name', "TEXT DEFAULT ''"],
+        ['users', 'last_name', "TEXT DEFAULT ''"],
+        ['users', 'default_risk', "REAL DEFAULT 1.0"],
+        ['users', 'preferences', "TEXT DEFAULT '{}'"],
+        ['users', 'avatar_url', "TEXT DEFAULT ''"],
+        ['users', 'is_pro', "INTEGER DEFAULT 0"],
+        ['users', 'colors', "TEXT DEFAULT '{}'"],
+
+        ['accounts', 'description', "TEXT DEFAULT ''"],
+        ['accounts', 'broker', "TEXT DEFAULT ''"],
+        ['accounts', 'platform', "TEXT DEFAULT ''"],
+        ['accounts', 'color', "TEXT DEFAULT '#4f46e5'"],
+        ['accounts', 'commission_pct', "REAL DEFAULT 0.0"],
+        ['accounts', 'commission_min', "REAL DEFAULT 0.0"],
+        ['accounts', 'commission_max', "REAL DEFAULT 0.0"],
+        ['accounts', 'max_risk', "REAL DEFAULT 2.0"],   // IMPORTANT
+        ['accounts', 'default_rr', "REAL DEFAULT 2.0"], // IMPORTANT
+
+        ['trades', 'account_id', "INTEGER"],
+        ['trades', 'time', "TEXT DEFAULT ''"],          // IMPORTANT
+        ['trades', 'discipline_score', "INTEGER DEFAULT 0"], // IMPORTANT
+        ['trades', 'discipline_details', "TEXT DEFAULT '{}'"], // IMPORTANT
+        ['trades', 'fees', "REAL DEFAULT 0"],
+        ['trades', 'tags', "TEXT DEFAULT ''"],
+        ['trades', 'is_off_plan', "INTEGER DEFAULT 0"],
+        ['trades', 'risk_respected', "INTEGER DEFAULT 0"],
+        ['trades', 'sl_moved', "INTEGER DEFAULT 0"],
+        ['trades', 'has_screenshot', "INTEGER DEFAULT 0"]
+    ];
+
+    columnsToAdd.forEach(([table, col, def]) => {
+        db.all(`PRAGMA table_info(${table})`, (err, rows) => {
+            if (!err && rows) {
+                if (!rows.some(r => r.name === col)) {
+                    db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`, (err) => {
+                        if (!err) console.log(`Migration: ${col} ajouté à ${table}`);
+                    });
+                }
+            }
+        });
     });
 };
 
 db.serialize(() => {
-    // TABLE USERS
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-                                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                 email TEXT UNIQUE,
-                                                 password TEXT,
-                                                 first_name TEXT,
-                                                 last_name TEXT,
-                                                 default_risk REAL DEFAULT 1.0,
-                                                 preferences TEXT DEFAULT '{}',
-                                                 avatar_url TEXT,
-                                                 is_pro INTEGER DEFAULT 0,
-                                                 colors TEXT
-            )`);
-
-    const defaultColors = JSON.stringify({
-        balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e'
-    });
-
-    addColumnIfNotExists('users', 'first_name', "TEXT DEFAULT ''");
-    addColumnIfNotExists('users', 'last_name', "TEXT DEFAULT ''");
-    addColumnIfNotExists('users', 'default_risk', "REAL DEFAULT 1.0");
-    addColumnIfNotExists('users', 'preferences', "TEXT DEFAULT '{}'");
-    addColumnIfNotExists('users', 'avatar_url', "TEXT DEFAULT ''");
-    addColumnIfNotExists('users', 'is_pro', "INTEGER DEFAULT 0");
-    addColumnIfNotExists('users', 'colors', `TEXT DEFAULT '${defaultColors}'`);
-
-    // --- TABLE COMPTES (ACCOUNTS) AVEC COLOR ---
-    db.run(`CREATE TABLE IF NOT EXISTS accounts (
-                                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                    user_id INTEGER,
-                                                    name TEXT,
-                                                    description TEXT,
-                                                    broker TEXT,
-                                                    platform TEXT,
-                                                    color TEXT DEFAULT '#4f46e5',
-                                                    currency TEXT DEFAULT 'USD',
-                                                    commission_pct REAL DEFAULT 0.0,
-                                                    commission_min REAL DEFAULT 0.0,
-                                                    commission_max REAL DEFAULT 0.0,
-                                                    created_at TEXT,
-                                                    FOREIGN KEY(user_id) REFERENCES users(id)
-        )`);
-
-    // Migration pour ajouter les colonnes si la table existe déjà
-    addColumnIfNotExists('accounts', 'description', "TEXT DEFAULT ''");
-    addColumnIfNotExists('accounts', 'broker', "TEXT DEFAULT ''");
-    addColumnIfNotExists('accounts', 'platform', "TEXT DEFAULT ''");
-    addColumnIfNotExists('accounts', 'color', "TEXT DEFAULT '#4f46e5'"); // <-- CELLE-CI EST CRUCIALE
-    addColumnIfNotExists('accounts', 'commission_pct', "REAL DEFAULT 0.0");
-    addColumnIfNotExists('accounts', 'commission_min', "REAL DEFAULT 0.0");
-    addColumnIfNotExists('accounts', 'commission_max', "REAL DEFAULT 0.0");
-
-    // TABLE TRADES
+    // Création Tables de base
+    db.run(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT, created_at TEXT, FOREIGN KEY(user_id) REFERENCES users(id))`);
     db.run(`CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, pair TEXT, date TEXT, type TEXT, entry REAL, exit REAL, sl REAL, tp REAL, lot REAL, profit REAL, FOREIGN KEY(user_id) REFERENCES users(id))`);
-    addColumnIfNotExists('trades', 'account_id', "INTEGER");
-
     db.run(`CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, type TEXT, date TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, message TEXT, type TEXT, is_read INTEGER DEFAULT 0, date TEXT, FOREIGN KEY(user_id) REFERENCES users(id))`);
+
+    // Lancer les migrations de colonnes
+    ensureColumns();
 });
 
 const authenticateToken = (req, res, next) => {
@@ -122,7 +104,8 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- ROUTES AUTH ---
+// --- ROUTES ---
+
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
@@ -144,8 +127,7 @@ app.post('/api/register', (req, res) => {
             if (err) return res.status(400).json({ error: "Email utilisé" });
             const token = jwt.sign({ id: this.lastID, email }, SECRET_KEY, { expiresIn: '24h' });
             db.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (err, newUser) => {
-                let colors = {}; try { colors = JSON.parse(newUser.colors); } catch(e) {}
-                res.json({ token, user: { ...newUser, password: '', colors: colors } });
+                res.json({ token, user: { ...newUser, password: '' } });
             });
         }
     );
@@ -162,7 +144,9 @@ app.put('/api/user/update', authenticateToken, (req, res) => {
     if (preferences !== undefined) { updates.push("preferences = ?"); params.push(JSON.stringify(preferences)); }
     if (colors !== undefined) { updates.push("colors = ?"); params.push(JSON.stringify(colors)); }
     if (password) { updates.push("password = ?"); params.push(bcrypt.hashSync(password, 8)); }
+
     if (updates.length === 0) return res.json({ message: "Rien à modifier" });
+
     params.push(req.user.id);
     db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
@@ -183,27 +167,19 @@ app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, r
     });
 });
 
-// --- ROUTES COMPTES (CORRIGÉES) ---
-
+// --- ACCOUNTS ---
 app.get('/api/accounts', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM accounts WHERE user_id = ?`, [req.user.id], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-
-        // Création compte défaut si vide
         if (rows.length === 0) {
             const defaultName = 'Compte Principal';
             const date = new Date().toISOString();
-            db.run(`INSERT INTO accounts (user_id, name, color, created_at) VALUES (?, ?, ?, ?)`,
-                [req.user.id, defaultName, '#4f46e5', date],
+            // Création compte défaut avec colonnes complètes
+            db.run(`INSERT INTO accounts (user_id, name, color, max_risk, default_rr, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+                [req.user.id, defaultName, '#4f46e5', 2.0, 2.0, date],
                 function(err) {
                     if (err) return res.status(500).json({ error: err.message });
-                    const newId = this.lastID;
-                    db.run(`UPDATE trades SET account_id = ? WHERE user_id = ? AND account_id IS NULL`, [newId, req.user.id]);
-                    res.json([{
-                        id: newId, user_id: req.user.id, name: defaultName,
-                        color: '#4f46e5', currency: 'USD', broker: '', platform: '',
-                        commission_pct:0, commission_min:0, commission_max:0
-                    }]);
+                    res.json([{ id: this.lastID, user_id: req.user.id, name: defaultName, color: '#4f46e5', max_risk: 2.0, default_rr: 2.0 }]);
                 }
             );
         } else {
@@ -213,12 +189,10 @@ app.get('/api/accounts', authenticateToken, (req, res) => {
 });
 
 app.post('/api/accounts', authenticateToken, (req, res) => {
-    const { name, description, broker, platform, color, currency, commission_pct, commission_min, commission_max } = req.body;
+    const { name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max } = req.body;
     const date = new Date().toISOString();
-
-    // Sauvegarde de TOUS les champs, y compris COLOR
-    db.run(`INSERT INTO accounts (user_id, name, description, broker, platform, color, currency, commission_pct, commission_min, commission_max, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [req.user.id, name, description || '', broker || '', platform || '', color || '#4f46e5', currency || 'USD', commission_pct || 0, commission_min || 0, commission_max || 0, date],
+    db.run(`INSERT INTO accounts (user_id, name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.user.id, name, description || '', broker || '', platform || '', color || '#4f46e5', currency || 'USD', max_risk || 2.0, default_rr || 2.0, commission_pct || 0, commission_min || 0, commission_max || 0, date],
         function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ id: this.lastID, ...req.body });
@@ -227,10 +201,9 @@ app.post('/api/accounts', authenticateToken, (req, res) => {
 });
 
 app.put('/api/accounts/:id', authenticateToken, (req, res) => {
-    const { name, description, broker, platform, color, currency, commission_pct, commission_min, commission_max } = req.body;
-    // Mise à jour de TOUS les champs
-    db.run(`UPDATE accounts SET name=?, description=?, broker=?, platform=?, color=?, currency=?, commission_pct=?, commission_min=?, commission_max=? WHERE id=? AND user_id=?`,
-        [name, description, broker, platform, color, currency, commission_pct, commission_min, commission_max, req.params.id, req.user.id],
+    const { name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max } = req.body;
+    db.run(`UPDATE accounts SET name=?, description=?, broker=?, platform=?, color=?, currency=?, max_risk=?, default_rr=?, commission_pct=?, commission_min=?, commission_max=? WHERE id=? AND user_id=?`,
+        [name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max, req.params.id, req.user.id],
         function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ message: "Compte mis à jour" });
@@ -248,34 +221,65 @@ app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
     });
 });
 
-// --- ROUTES TRADES ---
+// --- TRADES ---
 app.get('/api/trades', authenticateToken, (req, res) => {
     const accountId = req.query.accountId;
-    if (!accountId) return res.status(400).json({ error: "Account ID required" });
-    db.all(`SELECT * FROM trades WHERE user_id = ? AND account_id = ? ORDER BY date DESC`, [req.user.id, accountId], (err, rows) => res.json(rows));
+    let sql = `SELECT * FROM trades WHERE user_id = ?`;
+    let params = [req.user.id];
+    if (accountId) { sql += ` AND account_id = ?`; params.push(accountId); }
+    sql += ` ORDER BY date DESC`;
+
+    db.all(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const parsedRows = rows.map(r => ({
+            ...r,
+            disciplineDetails: r.discipline_details ? JSON.parse(r.discipline_details) : {},
+            // Safe parsing des booléens
+            isOffPlan: Boolean(r.is_off_plan),
+            riskRespected: Boolean(r.risk_respected),
+            slMoved: Boolean(r.sl_moved),
+            hasScreenshot: Boolean(r.has_screenshot)
+        }));
+        res.json(parsedRows);
+    });
 });
 
 app.post('/api/trades', authenticateToken, (req, res) => {
-    const { account_id, pair, date, type, entry, exit, sl, tp, lot, profit } = req.body;
-    db.run(`INSERT INTO trades (user_id, account_id, pair, date, type, entry, exit, sl, tp, lot, profit) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        [req.user.id, account_id, pair, date, type, entry, exit, sl, tp, lot, profit], function(err) { res.json({ id: this.lastID, ...req.body }); });
+    const { account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved, hasScreenshot } = req.body;
+
+    // Requête sécurisée avec tous les champs
+    db.run(`INSERT INTO trades (user_id, account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, discipline_score, discipline_details, fees, tags, is_off_plan, risk_respected, sl_moved, has_screenshot) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+            req.user.id, account_id, pair, date, time || '', type, entry, exit, sl, tp, lot, profit,
+            disciplineScore || 0, JSON.stringify(disciplineDetails || {}), fees || 0, tags || '',
+            isOffPlan ? 1 : 0, riskRespected ? 1 : 0, slMoved ? 1 : 0, hasScreenshot ? 1 : 0
+        ],
+        function(err) {
+            if (err) {
+                console.error("SQL Error:", err.message); // Log pour debug
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID, ...req.body });
+        }
+    );
 });
 
 app.put('/api/trades/:id', authenticateToken, (req, res) => {
-    const { pair, date, type, entry, exit, sl, tp, lot, profit } = req.body;
-    db.run(`UPDATE trades SET pair=?, date=?, type=?, entry=?, exit=?, sl=?, tp=?, lot=?, profit=? WHERE id=? AND user_id=?`,
-        [pair, date, type, entry, exit, sl, tp, lot, profit, req.params.id, req.user.id], function(err) { res.json({ id: req.params.id, ...req.body }); });
+    const { pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved, hasScreenshot } = req.body;
+    db.run(`UPDATE trades SET pair=?, date=?, time=?, type=?, entry=?, exit=?, sl=?, tp=?, lot=?, profit=?, discipline_score=?, discipline_details=?, fees=?, tags=?, is_off_plan=?, risk_respected=?, sl_moved=?, has_screenshot=? WHERE id=? AND user_id=?`,
+        [pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, JSON.stringify(disciplineDetails), fees, tags, isOffPlan?1:0, riskRespected?1:0, slMoved?1:0, hasScreenshot?1:0, req.params.id, req.user.id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: req.params.id, ...req.body });
+        }
+    );
 });
 
 app.delete('/api/trades/:id', authenticateToken, (req, res) => {
-    db.run(`DELETE FROM trades WHERE id=? AND user_id=?`, [req.params.id, req.user.id], (err) => { res.json({ message: "Supprimé" }); });
+    db.run(`DELETE FROM trades WHERE id=? AND user_id=?`, [req.params.id, req.user.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Supprimé" });
+    });
 });
-
-// --- AUTRES ROUTES ---
-app.get('/api/notifications', authenticateToken, (req, res) => { db.all(`SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC`, [req.user.id], (err, rows) => { res.json(rows); }); });
-app.put('/api/notifications/read/:id', authenticateToken, (req, res) => { db.run(`UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], function(err) { res.json({ message: "Read" }); }); });
-app.put('/api/notifications/read', authenticateToken, (req, res) => { db.run(`UPDATE notifications SET is_read = 1 WHERE user_id = ?`, [req.user.id], function(err) { res.json({ message: "All Read" }); }); });
-app.get('/api/updates', authenticateToken, (req, res) => { db.all(`SELECT * FROM updates ORDER BY date DESC`, [], (err, rows) => res.json(rows)); });
-app.get('/api/admin/users', authenticateToken, (req, res) => { if(req.user.is_pro!==7) return res.sendStatus(403); db.all("SELECT * FROM users", [], (err, rows) => res.json(rows)); });
 
 app.listen(PORT, () => console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`));
