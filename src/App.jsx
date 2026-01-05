@@ -186,7 +186,6 @@ function App() {
 
             const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
 
-            // CALCUL SCORE DRAG & DROP
             const tradeForScore = {
                 entry: data.entry, sl: data.sl, lot: data.lot, pair: data.pair, exit: data.exit || 0, tp: data.tp || 0,
                 date: data.date, time: data.time || '12:00', isOffPlan: false, riskRespected: true, slMoved: false, tags: ['DragDrop'], hasScreenshot: true
@@ -212,31 +211,22 @@ function App() {
 
     const loadAccounts = async () => { try { const accs = await api.getAccounts(); setAccounts(accs); if (accs.length > 0) { if (currentAccount) { const updated = accs.find(a => a.id === currentAccount.id); if (updated) setCurrentAccount(updated); else setCurrentAccount(accs[0]); } else { setCurrentAccount(accs[0]); } } } catch (e) { console.error(e); } };
 
-    // --- LOAD TRADES AVEC AUTO-CORRECTION SCORE ---
+    // LOAD TRADES (Avec recalcul auto du score si manquant)
     const loadTrades = async () => {
         if (!currentAccount) return;
         setLoadingData(true);
         try {
             const data = await api.getTrades(currentAccount.id);
-
-            // Calcul du solde pour vérification
             let runningBalance = 0;
-
-            // On traite les trades pour vérifier si le score est manquant
             const processedTrades = data.sort((a,b) => new Date(a.date) - new Date(b.date)).map(t => {
                 const profit = parseFloat(t.profit) || 0;
                 runningBalance += profit;
-
-                // Si score manquant (0) et ce n'est pas un dépôt, on recalcule
                 if (t.pair !== 'SOLDE' && (!t.disciplineScore || t.disciplineScore === 0) && currentAccount) {
-                    // On recalcule avec le solde courant (approximation)
                     const tempScore = calculateDisciplineScore(t, currentAccount, runningBalance);
                     return { ...t, disciplineScore: tempScore.total, disciplineDetails: tempScore.details };
                 }
                 return t;
             });
-
-            // On remet dans l'ordre décroissant pour l'affichage
             setTrades(processedTrades.reverse());
         } catch (e) { console.error(e); } finally { setLoadingData(false); }
     };
@@ -261,40 +251,21 @@ function App() {
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
 
-    // --- ADD TRADE AVEC CALCUL SCORE ---
     const addTrade = async (trade) => {
         if (!currentAccount) return alert("Sélectionnez un compte");
-
-        // Calcul du Solde Actuel pour le score
         const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
-
-        // Calcul Score si pas déjà fait (ex: manuel)
         let discipline = { total: 0, details: {} };
-        if (trade.pair !== 'SOLDE') {
-            discipline = calculateDisciplineScore(trade, currentAccount, currentBalance);
-        }
-
-        const tradeWithAccount = {
-            ...trade,
-            account_id: currentAccount.id,
-            disciplineScore: discipline.total,
-            disciplineDetails: discipline.details
-        };
-
+        if (trade.pair !== 'SOLDE') { discipline = calculateDisciplineScore(trade, currentAccount, currentBalance); }
+        const tradeWithAccount = { ...trade, account_id: currentAccount.id, disciplineScore: discipline.total, disciplineDetails: discipline.details };
         const newTrade = await api.addTrade(tradeWithAccount);
         setTrades([newTrade, ...trades]);
         handleCloseModal();
     };
 
     const updateTrade = async (tradeData) => {
-        // Recalcul du score lors de la mise à jour aussi
         const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
         let discipline = { total: tradeData.disciplineScore, details: tradeData.disciplineDetails };
-
-        if (tradeData.pair !== 'SOLDE') {
-            discipline = calculateDisciplineScore(tradeData, currentAccount, currentBalance);
-        }
-
+        if (tradeData.pair !== 'SOLDE') { discipline = calculateDisciplineScore(tradeData, currentAccount, currentBalance); }
         const updatedData = { ...tradeData, disciplineScore: discipline.total, disciplineDetails: discipline.details };
         const updatedTrade = await api.updateTrade(updatedData.id, updatedData);
         setTrades(trades.map(t => t.id === updatedTrade.id ? updatedTrade : t));
@@ -309,15 +280,10 @@ function App() {
     const avatarSrc = user ? api.getAvatarUrl(user.avatar_url) : null;
     const activeColor = currentAccount?.color || DEFAULT_COLORS.balance;
 
-    // 1. Solde Actuel
     const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
-
-    // 2. Calculs Performance
     const realTrades = trades.filter(t => t.pair !== 'SOLDE');
     const totalPnL = realTrades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0);
-    const avgDiscipline = realTrades.length > 0
-        ? Math.round(realTrades.reduce((acc, t) => acc + (t.disciplineScore || 0), 0) / realTrades.length)
-        : 0;
+    const avgDiscipline = realTrades.length > 0 ? Math.round(realTrades.reduce((acc, t) => acc + (t.disciplineScore || 0), 0) / realTrades.length) : 0;
     const investedCapital = currentBalance - totalPnL;
     const totalGainPct = investedCapital > 0 ? (totalPnL / investedCapital) * 100 : 0;
 
@@ -332,7 +298,8 @@ function App() {
     return (
         <div className={`h-[100dvh] w-full transition-colors duration-300 ${isDark ? 'dark' : ''} overflow-hidden flex flex-col relative`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
             <TradingBackground />
-            {isDragging && (<div className="absolute inset-0 z-[100] bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">{user?.is_pro >= 1 ? (<><UploadCloud size={80} className="text-white mb-4 animate-bounce" /><h2 className="text-3xl font-black text-white">Relâchez pour ajouter !</h2><p className="text-indigo-100 mt-2">Scan automatique du profit, prix et dates</p></>) : (<><Crown size={80} className="text-amber-400 mb-4 animate-pulse" /><h2 className="text-3xl font-black text-white">Fonctionnalité Premium</h2><p className="text-indigo-100 mt-2">Passez PRO pour débloquer le scan automatique</p></>)}</div>)}
+
+            {isDragging && (<div className="absolute inset-0 z-[100] bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">{user?.is_pro >= 1 ? (<><UploadCloud size={80} className="text-white mb-4 animate-bounce" /><h2 className="text-3xl font-black text-white">Relâchez pour ajouter !</h2></>) : (<><Crown size={80} className="text-amber-400 mb-4 animate-pulse" /><h2 className="text-3xl font-black text-white">Premium Only</h2></>)}</div>)}
             {isProcessingFile && (<div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300"><div className="relative"><div className="absolute inset-0 bg-indigo-500 blur-xl opacity-50 rounded-full animate-pulse"></div><Loader2 size={64} className="text-white animate-spin relative z-10" /></div><h2 className="text-2xl font-bold text-white mt-6">Lecture de l'image...</h2><p className="text-gray-400 mt-2">Récupération du profit réel affiché</p></div>)}
 
             <AccountFormModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} onSave={handleSaveAccount} accountToEdit={editingAccount} />
@@ -346,7 +313,9 @@ function App() {
                 <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                     <header className="flex-none md:hidden h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] bg-white/80 dark:bg-[#262626] backdrop-blur-xl border-b border-gray-200 dark:border-neutral-800 flex items-center justify-between px-4 z-20"><div className="flex items-center gap-3 overflow-hidden"><div className="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 bg-gray-100 dark:bg-neutral-800 flex items-center justify-center">{avatarSrc ? <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" /> : <User size={18} className="text-gray-400" />}</div><div className="flex flex-row items-center gap-2 min-w-0"><span className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{user?.first_name || 'Trader'}</span><div className="flex-shrink-0">{renderMobileBadge()}</div></div></div><div className="flex items-center gap-2 flex-shrink-0"><button onClick={openNotifModal} className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors"><Bell size={20} className={unreadNotifsCount > 0 ? "text-indigo-500" : ""} />{unreadNotifsCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-[#262626]"></span>}</button><button onClick={() => handleNavClick('settings')} className="p-2 text-gray-500 hover:text-indigo-500 dark:text-gray-400 transition-colors"><Settings size={20} /></button><button onClick={() => setIsDark(!isDark)} className="p-2 text-gray-500 dark:text-gray-400">{isDark ? <Sun size={20} /> : <Moon size={20} />}</button></div></header>
 
-                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 bg-gray-50 dark:bg-black relative">
+                    {/* --- CONTENU PRINCIPAL --- */}
+                    {/* AJOUT DE 'pb-24' POUR LAISSER DE LA PLACE AU MENU FIXE SUR MOBILE */}
+                    <div className="flex-1 overflow-y-auto scrollbar-hide p-4 pb-24 md:p-8 md:pb-8 bg-gray-50 dark:bg-black relative">
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
 
                         <main className="max-w-7xl mx-auto pb-6">
@@ -355,22 +324,12 @@ function App() {
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-                                        <div className="col-span-2 lg:col-span-1 rounded-3xl p-5 md:p-6 text-white relative overflow-hidden shadow-lg transition-all" style={{ background: `linear-gradient(135deg, ${activeColor}, #000000)` }}>
-                                            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
-                                            <div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2 text-xs font-bold uppercase tracking-wider"><Wallet size={16} /> Solde Actuel</div><div className="text-3xl md:text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-1 text-[10px] md:text-xs opacity-60 font-medium truncate">{currentAccount?.name || 'Sélectionnez un compte'}</div></div>
-                                        </div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
-                                            <div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><BrainCircuit size={16} className={avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-indigo-500' : 'text-rose-500')} /><span>Discipline</span></div><div className={`text-2xl md:text-3xl font-black ${avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-gray-800 dark:text-white' : 'text-rose-500')}`}>{avgDiscipline}%</div><div className="text-[10px] text-gray-400 font-medium">Moyenne globale</div>
-                                        </div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
-                                            <div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><Activity size={16} className={totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Gain Total</span></div><div className={`text-2xl md:text-3xl font-black ${totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalPnL > 0 ? '+' : ''}{totalPnL.toFixed(2)}<span className="text-sm font-normal text-gray-400 ml-1">{currencySymbol}</span></div><div className="text-[10px] text-gray-400 font-medium">P&L Cumulé</div>
-                                        </div>
-                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center">
-                                            <div className="flex items-center gap-2 text-gray-400 mb-2 text-xs font-bold uppercase tracking-wider"><TrendingUp size={16} className={totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Croissance</span></div><div className={`text-2xl md:text-3xl font-black ${totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalGainPct > 0 ? '+' : ''}{totalGainPct.toFixed(2)}%</div><div className="text-[10px] text-gray-400 font-medium">Sur capital investi</div>
-                                        </div>
+                                        <div className="col-span-2 lg:col-span-1 rounded-3xl p-4 md:p-6 text-white relative overflow-hidden shadow-lg transition-all" style={{ background: `linear-gradient(135deg, ${activeColor}, #000000)` }}><div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div><div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><Wallet size={16} /> Solde Actuel</div><div className="text-2xl md:text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-1 text-[10px] md:text-xs opacity-60 font-medium truncate">{currentAccount?.name || 'Sélectionnez un compte'}</div></div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-3 md:p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><BrainCircuit size={16} className={avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-indigo-500' : 'text-rose-500')} /><span>Discipline</span></div><div className={`text-xl md:text-3xl font-black ${avgDiscipline >= 90 ? 'text-emerald-500' : (avgDiscipline >= 50 ? 'text-gray-800 dark:text-white' : 'text-rose-500')}`}>{avgDiscipline}%</div><div className="text-[10px] text-gray-400 font-medium">Moyenne globale</div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-3 md:p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><Activity size={16} className={totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Gain Total</span></div><div className={`text-xl md:text-3xl font-black ${totalPnL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalPnL > 0 ? '+' : ''}{totalPnL.toFixed(0)}<span className="text-sm font-normal text-gray-400 ml-1">{currencySymbol}</span></div><div className="text-[10px] text-gray-400 font-medium">P&L Cumulé</div></div>
+                                        <div className="bg-white dark:bg-neutral-900 rounded-3xl p-3 md:p-5 border border-gray-100 dark:border-neutral-800 shadow-sm flex flex-col justify-center"><div className="flex items-center gap-2 text-gray-400 mb-1 text-[10px] md:text-xs font-bold uppercase tracking-wider"><TrendingUp size={16} className={totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'} /><span>Croissance</span></div><div className={`text-xl md:text-3xl font-black ${totalGainPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{totalGainPct > 0 ? '+' : ''}{totalGainPct.toFixed(2)}%</div><div className="text-[10px] text-gray-400 font-medium">Sur capital investi</div></div>
                                     </div>
-
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"><Plus size={18} /> Nouveau Trade</button></div>
+                                    <div className="flex justify-between items-center"><h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95 text-sm md:text-base"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} currentAccount={currentAccount} user={user} onShowUpgrade={() => setShowUpgradeModal(true)} currentBalance={currentBalance} />
                                     {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}
                                 </div>
@@ -384,7 +343,12 @@ function App() {
                             {activeTab === 'settings' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>)}
                         </main>
                     </div>
-                    <div className="flex-none z-20 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"><MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} /></div>
+
+                    {/* --- MENU MOBILE FIXE (CORRECTION DU "BUG") --- */}
+                    {/* Position fixed + z-index haut + bottom-0 */}
+                    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)] shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)]">
+                        <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
+                    </div>
                 </div>
             </div>
         </div>
