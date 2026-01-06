@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2, TrendingUp, TrendingDown, BrainCircuit, Activity, ClipboardList } from 'lucide-react';
+import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2, TrendingUp, BrainCircuit, Activity } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { api } from './api';
 import { calculateDisciplineScore } from './utils/discipline';
@@ -24,6 +24,8 @@ import MobileMenu from './components/MobileMenu';
 import AccountSelector from './components/AccountSelector';
 import AccountFormModal from './components/AccountFormModal';
 import TodoView from './components/TodoView';
+import ShareTradeModal from './components/ShareTradeModal';
+import SimulatorView from './components/SimulatorView';
 
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
@@ -49,6 +51,7 @@ function App() {
     // Modals & Popups
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTrade, setEditingTrade] = useState(null);
+    const [tradeToShare, setTradeToShare] = useState(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [systemAlert, setSystemAlert] = useState(null);
@@ -206,21 +209,16 @@ function App() {
         } catch (error) { console.error(error); alert("Erreur : " + error.message); setIsProcessingFile(false); }
     };
 
-    // --- CORRECTION MAJEURE ICI : PROTECTION CONTRE CONFLITS DND ---
     const handleDragOver = (e) => {
         e.preventDefault();
-        if (activeTab !== 'journal') return;
-
-        // VÉRIFIER SI C'EST UN FICHIER
-        // Si on drag une div (todo list), types ne contient pas "Files"
+        if (activeTab !== 'journal' || isModalOpen) return;
         if (!e.dataTransfer.types.includes('Files')) return;
-
         setIsDragging(true);
     };
 
     const handleDragLeave = (e) => {
         e.preventDefault();
-        if (activeTab !== 'journal') return;
+        if (activeTab !== 'journal' || isModalOpen) return;
         setIsDragging(false);
     };
 
@@ -228,8 +226,8 @@ function App() {
         e.preventDefault();
         setIsDragging(false);
 
-        if (activeTab !== 'journal') return;
-        if (!e.dataTransfer.types.includes('Files')) return; // Double sécurité
+        if (activeTab !== 'journal' || isModalOpen) return;
+        if (!e.dataTransfer.types.includes('Files')) return;
 
         if (!user || user.is_pro < 1) { setShowUpgradeModal(true); return; }
         if (e.dataTransfer.files && e.dataTransfer.files[0]) processFileAndAddTrade(e.dataTransfer.files[0]);
@@ -237,7 +235,6 @@ function App() {
 
     const loadAccounts = async () => { try { const accs = await api.getAccounts(); setAccounts(accs); if (accs.length > 0) { if (currentAccount) { const updated = accs.find(a => a.id === currentAccount.id); if (updated) setCurrentAccount(updated); else setCurrentAccount(accs[0]); } else { setCurrentAccount(accs[0]); } } } catch (e) { console.error(e); } };
 
-    // LOAD TRADES
     const loadTrades = async () => {
         if (!currentAccount) return;
         setLoadingData(true);
@@ -276,6 +273,8 @@ function App() {
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
+    const handleShareTrade = (trade) => { setTradeToShare(trade); };
+
     const addTrade = async (trade) => { if (!currentAccount) return alert("Sélectionnez un compte"); const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0); let discipline = { total: 0, details: {} }; if (trade.pair !== 'SOLDE') { discipline = calculateDisciplineScore(trade, currentAccount, currentBalance); } const tradeWithAccount = { ...trade, account_id: currentAccount.id, disciplineScore: discipline.total, disciplineDetails: discipline.details }; const newTrade = await api.addTrade(tradeWithAccount); setTrades([newTrade, ...trades]); handleCloseModal(); };
     const updateTrade = async (tradeData) => { const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0); let discipline = { total: tradeData.disciplineScore, details: tradeData.disciplineDetails }; if (tradeData.pair !== 'SOLDE') { discipline = calculateDisciplineScore(tradeData, currentAccount, currentBalance); } const updatedData = { ...tradeData, disciplineScore: discipline.total, disciplineDetails: discipline.details }; const updatedTrade = await api.updateTrade(updatedData.id, updatedData); setTrades(trades.map(t => t.id === updatedTrade.id ? updatedTrade : t)); handleCloseModal(); };
     const deleteTrade = async (id) => { if (!window.confirm("Supprimer ?")) return; await api.deleteTrade(id); setTrades(trades.filter(t => t.id !== id)); };
@@ -311,6 +310,7 @@ function App() {
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
+            <ShareTradeModal isOpen={!!tradeToShare} onClose={() => setTradeToShare(null)} trade={tradeToShare} currencySymbol={currencySymbol} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
                 <Sidebar user={user} activeTab={activeTab} onNavClick={handleNavClick} onLogout={handleLogout} hasNewUpdates={hasNewUpdates} unreadNotifsCount={unreadNotifsCount} onOpenNotif={openNotifModal} />
@@ -324,17 +324,7 @@ function App() {
                         <main className="max-w-7xl mx-auto pb-6">
                             {['journal', 'graphs', 'calendar'].includes(activeTab) && (
                                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                                    <AccountSelector
-                                        accounts={accounts}
-                                        currentAccount={currentAccount}
-                                        onSelect={setCurrentAccount}
-                                        onCreate={handleCreateAccount}
-                                        onUpdate={handleUpdateAccount}
-                                        onDelete={handleDeleteAccount}
-                                        onOpenCreate={handleOpenCreateAccount}
-                                        onOpenEdit={handleOpenEditAccount}
-                                        isDark={isDark}
-                                    />
+                                    <AccountSelector accounts={accounts} currentAccount={currentAccount} onSelect={setCurrentAccount} onCreate={handleCreateAccount} onUpdate={handleUpdateAccount} onDelete={handleDeleteAccount} onOpenCreate={handleOpenCreateAccount} onOpenEdit={handleOpenEditAccount} isDark={isDark} />
                                 </div>
                             )}
 
@@ -352,30 +342,23 @@ function App() {
 
                                     <div className="flex justify-between items-center"><h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95 text-sm md:text-base"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} currentAccount={currentAccount} user={user} onShowUpgrade={() => setShowUpgradeModal(true)} currentBalance={currentBalance} />
-                                    {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} currencySymbol={currencySymbol} colors={colors} />}
+                                    {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} onShare={handleShareTrade} currencySymbol={currencySymbol} colors={colors} />}
                                 </div>
                             )}
 
                             {activeTab === 'updates' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><UpdatesView /></div>}
                             {activeTab === 'graphs' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><GraphView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
-                            {activeTab === 'calculator' && (
+                            {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user?.default_risk} currencySymbol={currencySymbol} colors={colors} /></div>}
+                            {activeTab === 'routine' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><TodoView user={user} onShowUpgrade={() => setShowUpgradeModal(true)} /></div>}
+                            {/* --- CORRECTION ICI : Ajout des props accounts et trades --- */}
+                            {activeTab === 'simulator' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <PositionCalculator
-                                        currentBalance={currentBalance}
-                                        defaultRisk={user?.default_risk}
-                                        currencySymbol={currencySymbol}
-                                        colors={colors}
-                                    />
-                                </div>
-                            )}
-                            {activeTab === 'routine' && (
-                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <TodoView user={user} onShowUpgrade={() => setShowUpgradeModal(true)} />
+                                    <SimulatorView currencySymbol={currencySymbol} accounts={accounts} trades={trades} />
                                 </div>
                             )}
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
-                            {activeTab === 'settings' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>)}
+                            {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>}
                         </main>
                     </div>
 

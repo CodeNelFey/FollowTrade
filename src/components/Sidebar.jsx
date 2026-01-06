@@ -1,76 +1,100 @@
 import React from 'react';
-import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, ShieldAlert, Settings, LogOut, ClipboardList, Crown, Sparkles, User, Bell } from 'lucide-react';
+import { LayoutDashboard, LineChart, Calendar, Calculator, Megaphone, Settings, LogOut, Crown, ClipboardList, TrendingUp, Wallet, Bell, User, ShieldAlert, Sparkles } from 'lucide-react';
 import { api } from '../api';
 
 const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadNotifsCount, onOpenNotif }) => {
 
-    const getBadge = () => {
-        if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>;
-        if (user.is_pro === 2) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Sparkles size={10} fill="currentColor" /> VIP</span>;
-        if (user.is_pro === 1) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Crown size={10} fill="currentColor" /> PRO</span>;
-        return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>;
-    };
+    const menuItems = [
+        { id: 'journal', icon: LayoutDashboard, label: 'Journal' },
+        { id: 'routine', icon: ClipboardList, label: 'Routine' },
+        { id: 'graphs', icon: LineChart, label: 'Analyses', isPro: true },
+        { id: 'calendar', icon: Calendar, label: 'Calendrier', isPro: true },
+        { id: 'simulator', icon: TrendingUp, label: 'Simulateur', isPro: true },
+        { id: 'calculator', icon: Calculator, label: 'Calculatrice' },
+        { id: 'updates', icon: Megaphone, label: 'Nouveautés', hasBadge: hasNewUpdates },
+    ];
 
-    const navItemClass = (tab) => `w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`;
+    if (user?.is_pro === 7) {
+        menuItems.push({ id: 'admin', icon: ShieldAlert, label: 'Admin Panel' });
+    }
 
-    const avatarSrc = api.getAvatarUrl(user.avatar_url);
+    const avatarSrc = user ? api.getAvatarUrl(user.avatar_url) : null;
+
+    // --- LOGIQUE DE BADGE RESTAURÉE ---
+    const renderBadge = () => { if (user.is_pro === 7) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><ShieldAlert size={10} fill="currentColor" /> ADMIN</span>; if (user.is_pro === 2) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Sparkles size={10} fill="currentColor" /> VIP</span>; if (user.is_pro === 1) return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border border-yellow-400/30 inline-flex items-center gap-1.5 shadow-sm min-w-[60px] justify-center"><Crown size={10} fill="currentColor" /> PRO</span>; return <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 dark:bg-white/10 dark:text-gray-300 dark:border-white/10 inline-flex items-center gap-1.5 min-w-[60px] justify-center"><User size={10} /> FREE</span>; };
+
 
     return (
-        <aside className="hidden md:flex flex-col w-64 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border-r border-gray-200 dark:border-neutral-800 p-6 gap-2">
-
-            {/* Header Profil */}
-            <div className="flex justify-between items-center mb-8 px-2">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/30 bg-indigo-600 flex items-center justify-center flex-shrink-0">
+        <aside className="hidden md:flex flex-col w-64 h-full bg-white dark:bg-[#262626] border-r border-gray-200 dark:border-neutral-800 relative z-20 transition-colors duration-300">
+            {/* Header User */}
+            <div className="p-6 border-b border-gray-100 dark:border-neutral-800">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-neutral-800 overflow-hidden border border-gray-200 dark:border-white/10 flex-shrink-0 flex items-center justify-center">
                         {avatarSrc ? (
-                            <img src={avatarSrc} alt="Avatar" className="w-full h-full object-cover" />
+                            <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
-                            <User size={20} className="text-white" />
+                            <User size={20} className="text-gray-400" />
                         )}
                     </div>
-                    <div className="min-w-0">
-                        <h1 className="font-black text-lg text-gray-900 dark:text-white truncate">
-                            {user.first_name || 'User'}
-                        </h1>
-                        {getBadge()}
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 dark:text-white truncate">{user?.first_name || 'Trader'}</h3>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            {renderBadge()}
+                        </div>
                     </div>
                 </div>
 
-                {/* Juste la cloche de notification ici désormais */}
-                <button onClick={onOpenNotif} className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-500 dark:text-gray-400">
-                    <Bell size={20} />
-                    {unreadNotifsCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-neutral-900 animate-pulse"></span>}
+                <button onClick={onOpenNotif} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 dark:bg-neutral-900 hover:bg-gray-100 dark:hover:bg-neutral-800 border border-gray-200 dark:border-neutral-800 transition-colors group">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400 group-hover:text-indigo-500">
+                        <Bell size={14} /> Notifications
+                    </div>
+                    {unreadNotifsCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                            {unreadNotifsCount}
+                        </span>
+                    )}
                 </button>
             </div>
 
-            <nav className="space-y-1 flex-1">
-                <button onClick={() => onNavClick('journal')} className={navItemClass('journal')}><LayoutDashboard size={20} /> Journal</button>
-                <button onClick={() => onNavClick('graphs')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'graphs' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
-                    <div className="flex items-center gap-3"><LineChart size={20} /> Analyses</div>
-                    {(user.is_pro < 1 || !user.is_pro) && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
-                </button>
-                <button onClick={() => onNavClick('calendar')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
-                    <div className="flex items-center gap-3"><CalendarIcon size={20} /> Calendrier</div>
-                    {(user.is_pro < 1 || !user.is_pro) && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
-                </button>
-                <button onClick={() => onNavClick('calculator')} className={navItemClass('calculator')}><Calculator size={20} /> Calculatrice</button>
-                <button onClick={() => onNavClick('updates')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'updates' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
-                    <div className="flex items-center gap-3"><Megaphone size={20} /> Nouveautés</div>
-                    {hasNewUpdates && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">1</span>}
-                </button>
-                <button
-                    onClick={() => onNavClick('routine')}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold ${activeTab === 'routine' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}
-                >
-                    <ClipboardList size={20} />
-                    <span>Routine</span>
-                </button>
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-hide">
+                {menuItems.map((item) => {
+                    const isActive = activeTab === item.id;
+                    const Icon = item.icon;
+                    const isLocked = item.isPro && user.is_pro === 0;
+
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onNavClick(item.id)}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group ${
+                                isActive
+                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 font-bold'
+                                    : 'text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Icon size={18} className={isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'} />
+                                <span className="text-sm">{item.label}</span>
+                            </div>
+
+                            {isLocked && <Crown size={12} className="text-amber-500" />}
+                            {item.hasBadge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+                        </button>
+                    );
+                })}
             </nav>
 
-            <div className="pt-6 border-t border-gray-200 dark:border-neutral-800 space-y-1">
-                {user.is_pro === 7 && <button onClick={() => onNavClick('admin')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'admin' ? 'bg-purple-500 text-white shadow-lg' : 'text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10'}`}><ShieldAlert size={20} /> Admin Panel</button>}
-                <button onClick={() => onNavClick('settings')} className={navItemClass('settings')}><Settings size={20} /> Paramètres</button>
-                <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all"><LogOut size={20} /> Déconnexion</button>
+            {/* Footer */}
+            <div className="p-3 border-t border-gray-200 dark:border-neutral-800 space-y-1">
+                <button onClick={() => onNavClick('settings')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold' : 'text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5'}`}>
+                    <Settings size={18} />
+                    <span className="text-sm">Paramètres</span>
+                </button>
+                <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-all">
+                    <LogOut size={18} />
+                    <span className="text-sm font-medium">Déconnexion</span>
+                </button>
             </div>
         </aside>
     );
