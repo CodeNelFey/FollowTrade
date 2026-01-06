@@ -3,6 +3,9 @@ import { api } from '../api';
 import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Plus } from 'lucide-react';
 
 const AdminPanel = () => {
+    // URL de ton backend (à modifier si tu mets en ligne plus tard)
+    const API_URL = 'http://localhost:3000';
+
     const [activeTab, setActiveTab] = useState('users');
 
     // USERS STATES
@@ -20,6 +23,15 @@ const AdminPanel = () => {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Fonction pour corriger l'URL de l'image
+    const getAvatarUrl = (url) => {
+        if (!url) return null;
+        // Si c'est déjà une URL complète ou un blob (upload local), on laisse tel quel
+        if (url.startsWith('http') || url.startsWith('blob:')) return url;
+        // Sinon, c'est un chemin relatif du serveur, on ajoute l'URL du serveur devant
+        return `${API_URL}${url}`;
+    };
 
     useEffect(() => {
         if (activeTab === 'users') loadUsers();
@@ -39,11 +51,13 @@ const AdminPanel = () => {
         try {
             const data = await api.adminGetAllUsers();
             if (Array.isArray(data)) {
-                // Le backend envoie maintenant des URLs complètes (https://...), on les utilise directement
                 setUsers(data);
                 setFilteredUsers(data);
             }
-        } catch (error) { setError("Erreur chargement users"); } finally { setLoading(false); }
+        } catch (error) {
+            console.error(error);
+            setError("Erreur chargement users");
+        } finally { setLoading(false); }
     };
 
     const loadUpdates = async () => {
@@ -58,18 +72,28 @@ const AdminPanel = () => {
         e.preventDefault();
         try {
             await api.adminUpdateUser(editingUser.id, formData);
-            // On recharge les utilisateurs pour avoir les URLs à jour
-            loadUsers();
+            await loadUsers(); // Recharger pour voir les modifs
             setEditingUser(null);
-        } catch (e) { alert("Erreur lors de la sauvegarde"); }
+        } catch (e) {
+            console.error(e);
+            alert("Erreur lors de la sauvegarde : " + (e.response?.data?.error || e.message));
+        }
     };
 
     const handleDeleteUser = async (id) => {
-        if (!window.confirm("Supprimer ce compte ?")) return;
-        try { await api.adminDeleteUser(id); setUsers(users.filter(u => u.id !== id)); } catch (e) { alert("Erreur"); }
+        if (!window.confirm("Supprimer ce compte définitivement ?")) return;
+        try {
+            await api.adminDeleteUser(id);
+            setUsers(users.filter(u => u.id !== id));
+            setFilteredUsers(filteredUsers.filter(u => u.id !== id));
+        } catch (e) { alert("Erreur lors de la suppression"); }
     };
 
-    const handleEditUserClick = (user) => { setEditingUser(user); setFormData({ ...user }); };
+    const handleEditUserClick = (user) => {
+        setEditingUser(user);
+        // On copie l'utilisateur pour ne pas modifier l'original directement
+        setFormData({ ...user });
+    };
 
     const handleSaveUpdate = async (e) => {
         e.preventDefault();
@@ -131,8 +155,9 @@ const AdminPanel = () => {
                             <div key={u.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-5 rounded-2xl border border-white/20 shadow-sm">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
+                                        {/* CORRECTION IMAGE ICI */}
                                         {u.avatar_url ? (
-                                            <img src={u.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                            <img src={getAvatarUrl(u.avatar_url)} className="w-full h-full object-cover" alt="Avatar" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={20}/></div>
                                         )}
@@ -171,8 +196,9 @@ const AdminPanel = () => {
                                     <tr key={u.id} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
+                                                {/* CORRECTION IMAGE ICI */}
                                                 {u.avatar_url ? (
-                                                    <img src={u.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                                    <img src={getAvatarUrl(u.avatar_url)} className="w-full h-full object-cover" alt="Avatar" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={14}/></div>
                                                 )}
@@ -226,13 +252,14 @@ const AdminPanel = () => {
                             <div className="flex flex-col items-center mb-8">
                                 <div className="relative group">
                                     <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-neutral-800 shadow-xl bg-gray-100 dark:bg-neutral-700 mb-3">
+                                        {/* CORRECTION IMAGE ICI AUSSI */}
                                         {formData.avatar_url ? (
-                                            <img src={formData.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                                            <img src={getAvatarUrl(formData.avatar_url)} className="w-full h-full object-cover" alt="Avatar" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-gray-400"><User size={40} /></div>
                                         )}
                                     </div>
-                                    {formData.avatar_url && <button type="button" onClick={() => setFormData({ ...formData, avatar_url: '' })} className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full shadow-md hover:scale-110"><Trash2 size={12} /></button>}
+                                    {/* Pas de modification d'image ici pour simplifier, on supprime juste si besoin */}
                                 </div>
                                 <h4 className="text-xl font-black text-gray-900 dark:text-white">{formData.first_name} {formData.last_name}</h4>
                                 <p className="text-sm text-gray-500">{formData.email}</p>
