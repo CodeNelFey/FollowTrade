@@ -26,8 +26,6 @@ import AccountFormModal from './components/AccountFormModal';
 import TodoView from './components/TodoView';
 import ShareTradeModal from './components/ShareTradeModal';
 import SimulatorView from './components/SimulatorView';
-import TradeDetailsModal from './components/TradeDetailsModal';
-
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
 const PAIRS = [
