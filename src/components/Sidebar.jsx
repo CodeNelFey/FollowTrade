@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, ShieldAlert, Settings, LogOut, Crown, Sparkles, User, Bell } from 'lucide-react';
+import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, ShieldAlert, Settings, LogOut, ClipboardList, Crown, Sparkles, User, Bell } from 'lucide-react';
 import { api } from '../api';
 
 const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadNotifsCount, onOpenNotif }) => {
@@ -57,6 +57,13 @@ const Sidebar = ({ user, activeTab, onNavClick, onLogout, hasNewUpdates, unreadN
                 <button onClick={() => onNavClick('updates')} className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'updates' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
                     <div className="flex items-center gap-3"><Megaphone size={20} /> Nouveautés</div>
                     {hasNewUpdates && <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">1</span>}
+                </button>
+                <button
+                    onClick={() => onNavClick('routine')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-bold ${activeTab === 'routine' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'}`}
+                >
+                    <ClipboardList size={20} />
+                    <span>Routine</span>
                 </button>
             </nav>
 

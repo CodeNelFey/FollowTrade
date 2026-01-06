@@ -43,6 +43,17 @@ export const api = {
     updateTrade: (id, trade) => request(`/trades/${id}`, { method: 'PUT', body: JSON.stringify(trade) }),
     deleteTrade: (id) => request(`/trades/${id}`, { method: 'DELETE' }),
 
+    // --- TODOLIST ---
+    getTodoLists: () => request('/todo-lists'),
+    createTodoList: (data) => request('/todo-lists', { method: 'POST', body: JSON.stringify(data) }),
+    deleteTodoList: (id) => request(`/todo-lists/${id}`, { method: 'DELETE' }),
+    // NOUVELLE MÉTHODE
+    reorderTodoLists: (lists) => request('/todo-lists/reorder', { method: 'PUT', body: JSON.stringify({ lists }) }),
+
+    addTodo: (data) => request('/todos', { method: 'POST', body: JSON.stringify(data) }),
+    toggleTodo: (id, is_completed) => request(`/todos/${id}`, { method: 'PUT', body: JSON.stringify({ is_completed }) }),
+    deleteTodo: (id) => request(`/todos/${id}`, { method: 'DELETE' }),
+
     getNotifications: () => request('/notifications'),
     markSingleNotificationRead: (id) => request(`/notifications/read/${id}`, { method: 'PUT' }),
     markNotificationsRead: () => request('/notifications/read', { method: 'PUT' }),

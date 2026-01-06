@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2, TrendingUp, TrendingDown, BrainCircuit, Activity } from 'lucide-react';
+import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2, TrendingUp, TrendingDown, BrainCircuit, Activity, ClipboardList } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { api } from './api';
 import { calculateDisciplineScore } from './utils/discipline';
@@ -23,6 +23,7 @@ import Sidebar from './components/Sidebar';
 import MobileMenu from './components/MobileMenu';
 import AccountSelector from './components/AccountSelector';
 import AccountFormModal from './components/AccountFormModal';
+import TodoView from './components/TodoView';
 
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
@@ -205,9 +206,34 @@ function App() {
         } catch (error) { console.error(error); alert("Erreur : " + error.message); setIsProcessingFile(false); }
     };
 
-    const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
-    const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
-    const handleDrop = (e) => { e.preventDefault(); setIsDragging(false); if (!user || user.is_pro < 1) { setShowUpgradeModal(true); return; } if (e.dataTransfer.files && e.dataTransfer.files[0]) processFileAndAddTrade(e.dataTransfer.files[0]); };
+    // --- CORRECTION MAJEURE ICI : PROTECTION CONTRE CONFLITS DND ---
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        if (activeTab !== 'journal') return;
+
+        // VÉRIFIER SI C'EST UN FICHIER
+        // Si on drag une div (todo list), types ne contient pas "Files"
+        if (!e.dataTransfer.types.includes('Files')) return;
+
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        if (activeTab !== 'journal') return;
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        if (activeTab !== 'journal') return;
+        if (!e.dataTransfer.types.includes('Files')) return; // Double sécurité
+
+        if (!user || user.is_pro < 1) { setShowUpgradeModal(true); return; }
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) processFileAndAddTrade(e.dataTransfer.files[0]);
+    };
 
     const loadAccounts = async () => { try { const accs = await api.getAccounts(); setAccounts(accs); if (accs.length > 0) { if (currentAccount) { const updated = accs.find(a => a.id === currentAccount.id); if (updated) setCurrentAccount(updated); else setCurrentAccount(accs[0]); } else { setCurrentAccount(accs[0]); } } } catch (e) { console.error(e); } };
 
@@ -245,7 +271,7 @@ function App() {
     const handleLogout = () => { api.removeToken(); setUser(null); setTrades([]); setAccounts([]); setCurrentAccount(null); setActiveTab('journal'); setViewMode('home'); };
     const handleUpdateUser = async (updatedData) => { const res = await api.updateUser(updatedData); setUser(res.user); api.setUser(res.user); };
     const navigateToAuth = (isSignUp = false) => { setAuthInitialState(isSignUp); setViewMode('auth'); };
-    const handleNavClick = (tab) => { const freeTabs = ['journal', 'calculator', 'settings', 'updates']; if (tab === 'updates') { setHasNewUpdates(false); if (latestUpdateId > 0) localStorage.setItem('last_read_update', latestUpdateId.toString()); } if (user?.is_pro >= 1 || freeTabs.includes(tab)) setActiveTab(tab); else setShowUpgradeModal(true); };
+    const handleNavClick = (tab) => { const freeTabs = ['journal', 'calculator', 'settings', 'updates', 'routine']; if (tab === 'updates') { setHasNewUpdates(false); if (latestUpdateId > 0) localStorage.setItem('last_read_update', latestUpdateId.toString()); } if (user?.is_pro >= 1 || freeTabs.includes(tab)) setActiveTab(tab); else setShowUpgradeModal(true); };
 
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
@@ -296,7 +322,6 @@ function App() {
                         <div className="absolute top-6 right-8 z-30 hidden md:block"><button onClick={() => setIsDark(!isDark)} className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-full shadow-lg border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-gray-300 hover:scale-110 transition-all active:scale-95 group">{isDark ? <Sun size={20} className="group-hover:rotate-90 transition-transform duration-500" /> : <Moon size={20} className="group-hover:-rotate-12 transition-transform duration-500" />}</button></div>
 
                         <main className="max-w-7xl mx-auto pb-6">
-                            {/* PASSER LA PROP isDark ICI */}
                             {['journal', 'graphs', 'calendar'].includes(activeTab) && (
                                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                                     <AccountSelector
@@ -316,7 +341,6 @@ function App() {
                             {activeTab === 'journal' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-                                        {/* MODIFICATION DU DEGRADE (PLUS DOUX) */}
                                         <div className="col-span-2 lg:col-span-1 rounded-3xl p-5 md:p-6 text-white relative overflow-hidden shadow-lg transition-all" style={{ background: `linear-gradient(135deg, ${activeColor}, ${isDark ? '#171717' : '#e5e7eb'})` }}>
                                             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
                                             <div className="relative z-10"><div className="flex items-center gap-2 text-white/80 mb-2 text-xs font-bold uppercase tracking-wider"><Wallet size={16} /> Solde Actuel</div><div className="text-3xl md:text-4xl font-black tracking-tight">{currentBalance.toLocaleString('en-US', { style: 'currency', currency: currencyCode })}</div><div className="mt-1 text-[10px] md:text-xs opacity-60 font-medium truncate">{currentAccount?.name || 'Sélectionnez un compte'}</div></div>
@@ -339,12 +363,18 @@ function App() {
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <PositionCalculator
                                         currentBalance={currentBalance}
-                                        defaultRisk={user?.default_risk} // Petit fix de sécurité ici
+                                        defaultRisk={user?.default_risk}
                                         currencySymbol={currencySymbol}
-                                        colors={colors} // <--- AJOUT ICI
+                                        colors={colors}
                                     />
                                 </div>
-                            )}                            {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
+                            )}
+                            {activeTab === 'routine' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <TodoView user={user} onShowUpgrade={() => setShowUpgradeModal(true)} />
+                                </div>
+                            )}
+                            {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
                             {activeTab === 'settings' && (<div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>)}
                         </main>
                     </div>
