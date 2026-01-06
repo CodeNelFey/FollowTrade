@@ -320,7 +320,6 @@ function App() {
 
             {/* MODALS SPÉCIFIQUES TRADE */}
             <ShareTradeModal isOpen={!!tradeToShare} onClose={() => setTradeToShare(null)} trade={tradeToShare} currencySymbol={currencySymbol} />
-            <TradeDetailsModal isOpen={!!viewingTrade} onClose={() => setViewingTrade(null)} trade={viewingTrade} currencySymbol={currencySymbol} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
                 <Sidebar user={user} activeTab={activeTab} onNavClick={handleNavClick} onLogout={handleLogout} hasNewUpdates={hasNewUpdates} unreadNotifsCount={unreadNotifsCount} onOpenNotif={openNotifModal} />
