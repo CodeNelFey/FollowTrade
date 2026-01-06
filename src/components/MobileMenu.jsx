@@ -12,73 +12,74 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
         { id: 'updates', icon: Megaphone, label: 'News', hasNotif: true },
     ];
 
+    // Couleur active par défaut
+    const activeColor = colors?.balance || '#4f46e5';
+
     return (
-        /* POSITIONNEMENT :
-           - 'fixed' : Pour flotter au-dessus du contenu
-           - 'bottom-2' : Collé plus bas (réduit la safe zone visible)
-           - 'left-2 right-2' : Marges latérales réduites pour maximiser l'espace
-           - 'z-50' : Toujours au-dessus
+        /* STYLE "FUSION" :
+           - fixed bottom-0 : Collé au bas de l'écran.
+           - w-full : Pleine largeur.
+           - bg-white dark:bg-black : Fond Noir pur en mode sombre pour fusionner avec la barre iPhone.
+           - border-t : Petite séparation subtile en haut.
+           - pb-[env(safe-area-inset-bottom)] : Étend le fond noir sous la barre de swipe, mais pousse les icônes vers le haut.
         */
-        <div className="md:hidden fixed bottom-2 left-2 right-2 z-50">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-black border-t border-gray-200 dark:border-neutral-900 pb-[env(safe-area-inset-bottom)] transition-colors duration-300">
 
-            {/* CONTENEUR ÎLOT (Le fond gris vient d'ici s'il n'est pas transparent) */}
-            <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-2xl rounded-2xl px-1 py-2 flex justify-between items-center relative transition-all duration-300">
-
+            <div className="flex justify-between items-center px-2 py-3">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
-                    const isLocked = item.isPro && user.is_pro === 0;
-
-                    // Couleur active dynamique (par défaut indigo si non fournie)
-                    const activeColor = colors?.balance || '#4f46e5';
+                    const isLocked = item.isPro && user?.is_pro === 0;
 
                     return (
                         <button
                             key={item.id}
                             onClick={() => onNavClick(item.id)}
-                            className="relative group flex-1 flex flex-col items-center justify-center transition-all duration-300 active:scale-90 py-1"
+                            className="relative group flex-1 flex flex-col items-center justify-center transition-all duration-200 active:scale-95 py-1"
                         >
-                            {/* Fond Actif (Lueur derrière l'icône) */}
+                            {/* Indicateur Actif (Lueur au-dessus) */}
                             {isActive && (
                                 <div
-                                    className="absolute inset-0 rounded-xl transition-all duration-300"
-                                    style={{ backgroundColor: `${activeColor}15` }} // 15% d'opacité
+                                    className="absolute -top-[13px] w-10 h-1 rounded-b-full shadow-[0_0_10px_rgba(79,70,229,0.5)] transition-all duration-300"
+                                    style={{ backgroundColor: activeColor, boxShadow: `0 0 12px ${activeColor}` }}
                                 />
                             )}
 
-                            {/* Indicateur de sélection (Barre sous l'icône) */}
-                            <span
-                                className={`absolute -bottom-1 w-6 h-1 rounded-t-full transition-all duration-300 ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}
-                                style={{ backgroundColor: activeColor }}
-                            ></span>
-
                             {/* Icône */}
-                            <div className={`relative p-2 rounded-xl transition-all duration-300 ${isActive ? '-translate-y-1' : ''}`}>
+                            <div className={`relative p-1 rounded-xl transition-all duration-300 ${isActive ? '-translate-y-1' : ''}`}>
                                 <Icon
                                     size={24}
                                     className={`transition-colors duration-300 ${
                                         isActive
                                             ? 'text-gray-900 dark:text-white'
-                                            : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                                            : 'text-gray-400 dark:text-neutral-600 group-hover:text-gray-600 dark:group-hover:text-gray-400'
                                     }`}
                                     style={isActive ? { color: activeColor } : {}}
                                 />
 
-                                {/* Badge Couronne (PRO) */}
+                                {/* Badge PRO */}
                                 {isLocked && (
-                                    <div className="absolute -top-1 -right-1 bg-white/90 dark:bg-neutral-800/90 rounded-full p-0.5 shadow-sm border border-gray-100 dark:border-neutral-700">
+                                    <div className="absolute -top-1 -right-1 bg-black/10 dark:bg-white/10 rounded-full p-0.5 backdrop-blur-sm">
                                         <Crown size={8} className="text-amber-500 fill-amber-500" />
                                     </div>
                                 )}
 
-                                {/* Badge Notification (News) */}
+                                {/* Badge Notification */}
                                 {item.hasNotif && hasNewUpdates && (
-                                    <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white dark:border-neutral-900"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white dark:border-black"></span>
                                     </span>
                                 )}
                             </div>
+
+                            {/* Label (affiché uniquement si actif pour un look épuré) */}
+                            <span
+                                className={`text-[9px] font-bold mt-0.5 transition-all duration-300 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 hidden'}`}
+                                style={{ color: activeColor }}
+                            >
+                                {item.label}
+                            </span>
                         </button>
                     );
                 })}
