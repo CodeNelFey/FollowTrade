@@ -26,6 +26,7 @@ import AccountFormModal from './components/AccountFormModal';
 import TodoView from './components/TodoView';
 import ShareTradeModal from './components/ShareTradeModal';
 import SimulatorView from './components/SimulatorView';
+import TradeDetailsModal from './components/TradeDetailsModal';
 
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
@@ -51,7 +52,11 @@ function App() {
     // Modals & Popups
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTrade, setEditingTrade] = useState(null);
+
+    // NOUVEAUX ÉTATS POUR LES MODALS
     const [tradeToShare, setTradeToShare] = useState(null);
+    const [viewingTrade, setViewingTrade] = useState(null);
+
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [systemAlert, setSystemAlert] = useState(null);
@@ -273,7 +278,10 @@ function App() {
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
     const handleCloseModal = () => { setIsModalOpen(false); setEditingTrade(null); };
+
+    // --- NOUVELLES FONCTIONS DE HANDLER ---
     const handleShareTrade = (trade) => { setTradeToShare(trade); };
+    const handleViewTrade = (trade) => { setViewingTrade(trade); };
 
     const addTrade = async (trade) => { if (!currentAccount) return alert("Sélectionnez un compte"); const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0); let discipline = { total: 0, details: {} }; if (trade.pair !== 'SOLDE') { discipline = calculateDisciplineScore(trade, currentAccount, currentBalance); } const tradeWithAccount = { ...trade, account_id: currentAccount.id, disciplineScore: discipline.total, disciplineDetails: discipline.details }; const newTrade = await api.addTrade(tradeWithAccount); setTrades([newTrade, ...trades]); handleCloseModal(); };
     const updateTrade = async (tradeData) => { const currentBalance = trades.reduce((acc, t) => acc + (parseFloat(t.profit) || 0), 0); let discipline = { total: tradeData.disciplineScore, details: tradeData.disciplineDetails }; if (tradeData.pair !== 'SOLDE') { discipline = calculateDisciplineScore(tradeData, currentAccount, currentBalance); } const updatedData = { ...tradeData, disciplineScore: discipline.total, disciplineDetails: discipline.details }; const updatedTrade = await api.updateTrade(updatedData.id, updatedData); setTrades(trades.map(t => t.id === updatedTrade.id ? updatedTrade : t)); handleCloseModal(); };
@@ -306,11 +314,15 @@ function App() {
             {isDragging && (<div className="absolute inset-0 z-[100] bg-indigo-600/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">{user?.is_pro >= 1 ? (<><UploadCloud size={80} className="text-white mb-4 animate-bounce" /><h2 className="text-3xl font-black text-white">Relâchez pour ajouter !</h2></>) : (<><Crown size={80} className="text-amber-400 mb-4 animate-pulse" /><h2 className="text-3xl font-black text-white">Premium Only</h2></>)}</div>)}
             {isProcessingFile && (<div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300"><div className="relative"><div className="absolute inset-0 bg-indigo-500 blur-xl opacity-50 rounded-full animate-pulse"></div><Loader2 size={64} className="text-white animate-spin relative z-10" /></div><h2 className="text-2xl font-bold text-white mt-6">Lecture de l'image...</h2><p className="text-gray-400 mt-2">Récupération du profit réel affiché</p></div>)}
 
+            {/* MODALS GLOBAUX */}
             <AccountFormModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} onSave={handleSaveAccount} accountToEdit={editingAccount} />
             <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
             <AlertPopup notification={systemAlert} onClose={closeSystemAlert} />
             <NotificationModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} notifications={notifications} />
+
+            {/* MODALS SPÉCIFIQUES TRADE */}
             <ShareTradeModal isOpen={!!tradeToShare} onClose={() => setTradeToShare(null)} trade={tradeToShare} currencySymbol={currencySymbol} />
+            <TradeDetailsModal isOpen={!!viewingTrade} onClose={() => setViewingTrade(null)} trade={viewingTrade} currencySymbol={currencySymbol} />
 
             <div className="relative z-10 flex flex-1 h-full overflow-hidden">
                 <Sidebar user={user} activeTab={activeTab} onNavClick={handleNavClick} onLogout={handleLogout} hasNewUpdates={hasNewUpdates} unreadNotifsCount={unreadNotifsCount} onOpenNotif={openNotifModal} />
@@ -342,7 +354,17 @@ function App() {
 
                                     <div className="flex justify-between items-center"><h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Historique</h2><button onClick={handleOpenAddModal} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95 text-sm md:text-base"><Plus size={18} /> Nouveau Trade</button></div>
                                     <TradeForm isOpen={isModalOpen} onClose={handleCloseModal} onAddTrade={addTrade} onUpdateTrade={updateTrade} tradeToEdit={editingTrade} currencySymbol={currencySymbol} currentAccount={currentAccount} user={user} onShowUpgrade={() => setShowUpgradeModal(true)} currentBalance={currentBalance} />
-                                    {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> : <TradeHistory trades={trades} onDelete={deleteTrade} onEdit={handleOpenEditModal} onShare={handleShareTrade} currencySymbol={currencySymbol} colors={colors} />}
+                                    {loadingData ? <div className="text-center py-10 text-gray-400 animate-pulse">Chargement...</div> :
+                                        <TradeHistory
+                                            trades={trades}
+                                            onDelete={deleteTrade}
+                                            onEdit={handleOpenEditModal}
+                                            onShare={handleShareTrade} // PROPS POUR SHARE
+                                            onView={handleViewTrade} // PROPS POUR DETAILS
+                                            currencySymbol={currencySymbol}
+                                            colors={colors}
+                                        />
+                                    }
                                 </div>
                             )}
 
@@ -351,17 +373,20 @@ function App() {
                             {activeTab === 'calendar' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><CalendarView trades={trades} currencySymbol={currencySymbol} colors={colors} /></div>}
                             {activeTab === 'calculator' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><PositionCalculator currentBalance={currentBalance} defaultRisk={user?.default_risk} currencySymbol={currencySymbol} colors={colors} /></div>}
                             {activeTab === 'routine' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><TodoView user={user} onShowUpgrade={() => setShowUpgradeModal(true)} /></div>}
-                            {/* --- CORRECTION ICI : Ajout des props accounts et trades --- */}
+
+                            {/* VUE SIMULATEUR AVEC LES BONNES PROPS */}
                             {activeTab === 'simulator' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <SimulatorView currencySymbol={currencySymbol} accounts={accounts} trades={trades} />
                                 </div>
                             )}
+
                             {activeTab === 'admin' && user.is_pro === 7 && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><AdminPanel /></div>}
                             {activeTab === 'settings' && <div className="animate-in fade-in slide-in-from-bottom-4 duration-500"><SettingsView user={user} onUpdateUser={handleUpdateUser} onClose={() => setActiveTab('journal')} onLogout={handleLogout} onNavigate={setActiveTab} /></div>}
                         </main>
                     </div>
 
+                    {/* CORRECTION : On retire le background et la border ici car le menu est flottant */}
                     <div className="md:hidden">
                         <MobileMenu activeTab={activeTab} onNavClick={handleNavClick} user={user} hasNewUpdates={hasNewUpdates} colors={colors} />
                     </div>
