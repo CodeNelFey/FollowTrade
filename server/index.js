@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = 3000;
@@ -34,253 +35,106 @@ const db = new sqlite3.Database('./journal.db', (err) => {
     console.log('✅ Connecté à SQLite.');
 });
 
-// --- MIGRATION ROBUSTE ---
-const ensureColumns = () => {
-    const columnsToAdd = [
-        ['accounts', 'max_risk', "REAL DEFAULT 2.0"],
-        ['accounts', 'default_rr', "REAL DEFAULT 2.0"],
-        ['trades', 'account_id', "INTEGER"],
-        ['trades', 'time', "TEXT DEFAULT ''"],
-        ['trades', 'discipline_score', "INTEGER DEFAULT 0"],
-        ['trades', 'discipline_details', "TEXT DEFAULT '{}'"],
-        ['trades', 'fees', "REAL DEFAULT 0"],
-        ['trades', 'tags', "TEXT DEFAULT ''"],
-        ['trades', 'is_off_plan', "INTEGER DEFAULT 0"],
-        ['trades', 'risk_respected', "INTEGER DEFAULT 0"],
-        ['trades', 'sl_moved', "INTEGER DEFAULT 0"],
-        ['trades', 'has_screenshot', "INTEGER DEFAULT 0"],
-        ['todos', 'list_id', "INTEGER REFERENCES todo_lists(id) ON DELETE CASCADE"],
-        ['todos', 'created_at', "TEXT"],
-        ['todo_lists', 'position', "INTEGER DEFAULT 0"]
-    ];
+// --- CONFIG EMAIL ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+});
 
-    columnsToAdd.forEach(([table, col, def]) => {
-        db.all(`PRAGMA table_info(${table})`, (err, rows) => {
-            if (!err && rows && !rows.some(r => r.name === col)) {
-                db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
-            }
-        });
-    });
-};
+// --- TEMPLATES ---
+const wrapEmailHTML = (title, content) => `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;width:100%;background-color:#09090b;font-family:sans-serif}.btn{display:inline-block;background:#4f46e5;color:#fff!important;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:bold}</style></head><body style="background-color:#09090b;margin:0;padding:20px"><table width="100%" style="background-color:#09090b"><tr><td align="center"><table width="100%" style="max-width:600px;background-color:#18181b;border-radius:16px;border:1px solid #27272a"><tr><td align="center" style="padding:40px 0 20px 0"><img src="cid:logo" alt="Logo" width="180" style="display:block;border:0"></td></tr><tr><td style="padding:0 40px 40px 40px;color:#e4e4e7;line-height:1.6"><h2 style="color:#fff;margin-top:0">${title}</h2>${content}</td></tr></table></td></tr></table></body></html>`;
+const getVerificationTemplate = (code) => wrapEmailHTML("Code de vérification", `<p>Votre code :</p><div style="background:#09090b;padding:20px;text-align:center;font-size:32px;font-weight:800;color:#818cf8;letter-spacing:5px;border-radius:12px;border:1px solid #27272a">${code}</div>`);
+const getWelcomeTemplate = (name) => wrapEmailHTML("Bienvenue !", `<p>Félicitations ${name}, votre compte est activé !</p><div style="text-align:center;margin-top:30px"><a href="http://localhost:5173" class="btn">Accéder</a></div>`);
+const getGenericTemplate = (t, txt, url, btn) => wrapEmailHTML(t, `<p>${txt}</p>${url ? `<div style="text-align:center;margin-top:30px"><a href="${url}" class="btn">${btn}</a></div>` : ''}`);
 
+// --- DB INIT ---
 db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, first_name TEXT, last_name TEXT, default_risk REAL DEFAULT 1.0, preferences TEXT DEFAULT '{}', avatar_url TEXT, is_pro INTEGER DEFAULT 0, colors TEXT)`);
+    // Création des tables
+    db.run(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, password TEXT, first_name TEXT, last_name TEXT, default_risk REAL DEFAULT 1.0, preferences TEXT DEFAULT '{}', avatar_url TEXT, is_pro INTEGER DEFAULT 0, colors TEXT, verification_code TEXT, is_verified INTEGER DEFAULT 0)`);
     db.run(`CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT, description TEXT, broker TEXT, platform TEXT, color TEXT DEFAULT '#4f46e5', currency TEXT DEFAULT 'USD', max_risk REAL DEFAULT 2.0, default_rr REAL DEFAULT 2.0, commission_pct REAL DEFAULT 0.0, commission_min REAL DEFAULT 0.0, commission_max REAL DEFAULT 0.0, created_at TEXT, FOREIGN KEY(user_id) REFERENCES users(id))`);
     db.run(`CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, account_id INTEGER, pair TEXT, date TEXT, time TEXT, type TEXT, entry REAL, exit REAL, sl REAL, tp REAL, lot REAL, profit REAL, discipline_score INTEGER DEFAULT 0, discipline_details TEXT DEFAULT '{}', fees REAL DEFAULT 0, tags TEXT DEFAULT '', is_off_plan INTEGER DEFAULT 0, risk_respected INTEGER DEFAULT 0, sl_moved INTEGER DEFAULT 0, has_screenshot INTEGER DEFAULT 0, FOREIGN KEY(user_id) REFERENCES users(id))`);
     db.run(`CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, type TEXT, date TEXT)`);
     db.run(`CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, message TEXT, type TEXT, is_read INTEGER DEFAULT 0, date TEXT, FOREIGN KEY(user_id) REFERENCES users(id))`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS todo_lists (
-                                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                                      user_id INTEGER,
-                                                      title TEXT,
-                                                      icon TEXT,
-                                                      color TEXT,
-                                                      frequency TEXT,
-                                                      last_reset TEXT,
-                                                      created_at TEXT,
-                                                      position INTEGER DEFAULT 0,
-                                                      FOREIGN KEY(user_id) REFERENCES users(id)
-        )`);
-
+    db.run(`CREATE TABLE IF NOT EXISTS todo_lists (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT, icon TEXT, color TEXT, frequency TEXT, last_reset TEXT, created_at TEXT, position INTEGER DEFAULT 0, FOREIGN KEY(user_id) REFERENCES users(id))`);
     db.run(`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, list_id INTEGER, user_id INTEGER, text TEXT, is_completed INTEGER DEFAULT 0, created_at TEXT, FOREIGN KEY(list_id) REFERENCES todo_lists(id) ON DELETE CASCADE)`);
 
-    ensureColumns();
+    // Migration robuste
+    const migrations = [
+        "ALTER TABLE users ADD COLUMN verification_code TEXT", "ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0",
+        "ALTER TABLE accounts ADD COLUMN max_risk REAL DEFAULT 2.0", "ALTER TABLE accounts ADD COLUMN default_rr REAL DEFAULT 2.0",
+        "ALTER TABLE trades ADD COLUMN account_id INTEGER", "ALTER TABLE trades ADD COLUMN time TEXT DEFAULT ''", "ALTER TABLE trades ADD COLUMN discipline_score INTEGER DEFAULT 0", "ALTER TABLE trades ADD COLUMN discipline_details TEXT DEFAULT '{}'", "ALTER TABLE trades ADD COLUMN fees REAL DEFAULT 0", "ALTER TABLE trades ADD COLUMN tags TEXT DEFAULT ''", "ALTER TABLE trades ADD COLUMN is_off_plan INTEGER DEFAULT 0", "ALTER TABLE trades ADD COLUMN risk_respected INTEGER DEFAULT 0", "ALTER TABLE trades ADD COLUMN sl_moved INTEGER DEFAULT 0", "ALTER TABLE trades ADD COLUMN has_screenshot INTEGER DEFAULT 0",
+        "ALTER TABLE todos ADD COLUMN list_id INTEGER REFERENCES todo_lists(id) ON DELETE CASCADE", "ALTER TABLE todos ADD COLUMN created_at TEXT", "ALTER TABLE todo_lists ADD COLUMN position INTEGER DEFAULT 0"
+    ];
+    migrations.forEach(q => db.run(q, (err) => { if (err && !err.message.includes('duplicate column')) console.error("Migration warning:", err.message); }));
+    db.run(`UPDATE users SET is_verified = 1 WHERE is_verified IS NULL OR (is_verified = 0 AND verification_code IS NULL)`);
 });
 
-// --- MIDDLEWARE AUTH ---
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) return res.sendStatus(401);
-    jwt.verify(token, SECRET_KEY, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
+    jwt.verify(token, SECRET_KEY, (err, user) => { if (err) return res.sendStatus(403); req.user = user; next(); });
 };
 
-// --- ROUTES AUTH ---
-
-// MODIFICATION ICI : On ajoute is_pro dans le token pour faciliter les vérifications futures
+// --- AUTH ---
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
         if (err || !user) return res.status(400).json({ error: "Utilisateur inconnu" });
+        if (user.is_verified === 0) return res.status(403).json({ error: "Compte non vérifié." });
         if (!bcrypt.compareSync(password, user.password)) return res.status(400).json({ error: "Mot de passe incorrect" });
-
-        // CORRECTION : Ajout de is_pro dans le token
         const token = jwt.sign({ id: user.id, email: user.email, is_pro: user.is_pro }, SECRET_KEY, { expiresIn: '24h' });
-
         let prefs = {}; try { prefs = JSON.parse(user.preferences); } catch(e) {}
         let colors = {}; try { colors = JSON.parse(user.colors); } catch(e) {}
-        res.json({ token, user: { ...user, password: '', preferences: prefs, colors: colors } });
+        res.json({ token, user: { ...user, password: '', preferences: prefs, colors } });
     });
 });
 
 app.post('/api/register', (req, res) => {
     const { email, password, first_name, last_name } = req.body;
     const hashedPassword = bcrypt.hashSync(password, 8);
-    db.run(`INSERT INTO users (email, password, first_name, last_name, is_pro) VALUES (?, ?, ?, ?, 0)`, [email, hashedPassword, first_name || '', last_name || ''], function(err) {
-        if (err) return res.status(400).json({ error: "Email utilisé" });
-
-        // CORRECTION : Ajout de is_pro dans le token
-        const token = jwt.sign({ id: this.lastID, email, is_pro: 0 }, SECRET_KEY, { expiresIn: '24h' });
-
-        db.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (err, newUser) => res.json({ token, user: { ...newUser, password: '' } }));
-    });
-});
-
-// --- USER ROUTES ---
-app.put('/api/user/update', authenticateToken, (req, res) => {
-    const { first_name, last_name, email, password, default_risk, preferences, colors, is_pro } = req.body;
-    let updates = [], params = [];
-    if (first_name !== undefined) { updates.push("first_name = ?"); params.push(first_name); }
-    if (last_name !== undefined) { updates.push("last_name = ?"); params.push(last_name); }
-    if (email !== undefined) { updates.push("email = ?"); params.push(email); }
-    if (default_risk !== undefined) { updates.push("default_risk = ?"); params.push(default_risk); }
-
-    // Sécurité : Pour l'instant, on ignore is_pro ici pour éviter l'auto-promotion (géré par admin panel)
-    if (preferences !== undefined) { updates.push("preferences = ?"); params.push(JSON.stringify(preferences)); }
-    if (colors !== undefined) { updates.push("colors = ?"); params.push(JSON.stringify(colors)); }
-    if (password) { updates.push("password = ?"); params.push(bcrypt.hashSync(password, 8)); }
-
-    if (updates.length === 0) return res.json({ message: "Rien à modifier" });
-    params.push(req.user.id);
-
-    db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id], (err, user) => {
-            let prefs = {}; try { prefs = JSON.parse(user.preferences); } catch(e) {}
-            let userColors = {}; try { userColors = JSON.parse(user.colors); } catch(e) {}
-            res.json({ message: "Profil mis à jour", user: { ...user, password: '', preferences: prefs, colors: userColors } });
-        });
-    });
-});
-
-app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "Aucun fichier" });
-    const url = `/uploads/${req.file.filename}`;
-    db.run(`UPDATE users SET avatar_url = ? WHERE id = ?`, [url, req.user.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Avatar OK", avatar_url: url });
-    });
-});
-
-// --- ACCOUNTS ROUTES ---
-app.get('/api/accounts', authenticateToken, (req, res) => {
-    db.all(`SELECT * FROM accounts WHERE user_id = ?`, [req.user.id], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (rows.length === 0) {
-            const date = new Date().toISOString();
-            db.run(`INSERT INTO accounts (user_id, name, color, max_risk, default_rr, created_at) VALUES (?, ?, ?, ?, ?, ?)`, [req.user.id, 'Compte Principal', '#4f46e5', 2.0, 2.0, date], function(err) {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json([{ id: this.lastID, user_id: req.user.id, name: 'Compte Principal', color: '#4f46e5', max_risk: 2.0, default_rr: 2.0 }]);
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, existing) => {
+        if (existing) {
+            if (existing.is_verified === 1) return res.status(400).json({ error: "Email déjà utilisé." });
+            db.run(`UPDATE users SET password = ?, first_name = ?, last_name = ?, verification_code = ? WHERE id = ?`, [hashedPassword, first_name, last_name, code, existing.id], async () => {
+                await transporter.sendMail({ from: '"FollowTrade" <no-reply@followtrade.com>', to: email, subject: "Code de vérification", html: getVerificationTemplate(code), attachments: [{ filename: 'logo.png', path: path.join(__dirname, 'uploads', 'logo.png'), cid: 'logo' }] });
+                res.json({ message: "Code renvoyé", requiresVerification: true, email });
             });
         } else {
-            res.json(rows);
+            db.run(`INSERT INTO users (email, password, first_name, last_name, is_pro, verification_code, is_verified) VALUES (?, ?, ?, ?, 0, ?, 0)`, [email, hashedPassword, first_name || '', last_name || '', code], async () => {
+                await transporter.sendMail({ from: '"FollowTrade" <no-reply@followtrade.com>', to: email, subject: "Code de vérification", html: getVerificationTemplate(code), attachments: [{ filename: 'logo.png', path: path.join(__dirname, 'uploads', 'logo.png'), cid: 'logo' }] });
+                res.json({ message: "Compte créé", requiresVerification: true, email });
+            });
         }
     });
 });
 
-app.post('/api/accounts', authenticateToken, (req, res) => {
-    const { name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max } = req.body;
-    const date = new Date().toISOString();
-    db.run(`INSERT INTO accounts (user_id, name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, name, description||'', broker||'', platform||'', color||'#4f46e5', currency||'USD', max_risk||2.0, default_rr||2.0, commission_pct||0, commission_min||0, commission_max||0, date], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: this.lastID, ...req.body });
-    });
-});
-
-app.put('/api/accounts/:id', authenticateToken, (req, res) => {
-    const { name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max } = req.body;
-    db.run(`UPDATE accounts SET name=?, description=?, broker=?, platform=?, color=?, currency=?, max_risk=?, default_rr=?, commission_pct=?, commission_min=?, commission_max=? WHERE id=? AND user_id=?`, [name, description, broker, platform, color, currency, max_risk, default_rr, commission_pct, commission_min, commission_max, req.params.id, req.user.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Compte mis à jour" });
-    });
-});
-
-app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
-    db.serialize(() => {
-        db.run(`DELETE FROM trades WHERE account_id = ? AND user_id = ?`, [req.params.id, req.user.id]);
-        db.run(`DELETE FROM accounts WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Compte supprimé" });
+app.post('/api/verify-email', (req, res) => {
+    const { email, code } = req.body;
+    db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
+        if (err || !user) return res.status(400).json({ error: "Utilisateur introuvable" });
+        if (user.is_verified === 1) return res.status(400).json({ error: "Déjà vérifié" });
+        if (String(user.verification_code) !== String(code)) return res.status(400).json({ error: "Code incorrect" });
+        db.run(`UPDATE users SET is_verified = 1, verification_code = NULL WHERE id = ?`, [user.id], async () => {
+            await transporter.sendMail({ from: '"FollowTrade" <no-reply@followtrade.com>', to: email, subject: "Bienvenue !", html: getWelcomeTemplate(user.first_name), attachments: [{ filename: 'logo.png', path: path.join(__dirname, 'uploads', 'logo.png'), cid: 'logo' }] });
+            const token = jwt.sign({ id: user.id, email: user.email, is_pro: user.is_pro }, SECRET_KEY, { expiresIn: '24h' });
+            db.get(`SELECT * FROM users WHERE id = ?`, [user.id], (err, u) => {
+                let prefs = {}; try { prefs = JSON.parse(u.preferences); } catch(e) {}
+                let colors = {}; try { colors = JSON.parse(u.colors); } catch(e) {}
+                res.json({ token, user: { ...u, password: '', preferences: prefs, colors } });
+            });
         });
     });
 });
 
-// --- TRADES ROUTES ---
-app.get('/api/trades', authenticateToken, (req, res) => {
-    const accountId = req.query.accountId;
-    let sql = `SELECT * FROM trades WHERE user_id = ?`;
-    let params = [req.user.id];
-    if (accountId) { sql += ` AND account_id = ?`; params.push(accountId); }
-    sql += ` ORDER BY date DESC`;
-    db.all(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const parsed = rows.map(r => ({ ...r, disciplineScore: r.discipline_score, disciplineDetails: r.discipline_details ? JSON.parse(r.discipline_details) : {}, isOffPlan: !!r.is_off_plan, riskRespected: !!r.risk_respected, slMoved: !!r.sl_moved, hasScreenshot: !!r.has_screenshot }));
-        res.json(parsed);
-    });
-});
-
-app.post('/api/trades', authenticateToken, (req, res) => {
-    const { account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved, hasScreenshot } = req.body;
-    db.run(`INSERT INTO trades (user_id, account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, discipline_score, discipline_details, fees, tags, is_off_plan, risk_respected, sl_moved, has_screenshot) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [req.user.id, account_id, pair, date, time||'', type, entry, exit, sl, tp, lot, profit, disciplineScore || 0, JSON.stringify(disciplineDetails || {}), fees || 0, tags || '', isOffPlan ? 1 : 0, riskRespected ? 1 : 0, slMoved ? 1 : 0, hasScreenshot ? 1 : 0], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: this.lastID, ...req.body });
-    });
-});
-
-app.put('/api/trades/:id', authenticateToken, (req, res) => {
-    const { pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved, hasScreenshot } = req.body;
-    db.run(`UPDATE trades SET pair=?, date=?, time=?, type=?, entry=?, exit=?, sl=?, tp=?, lot=?, profit=?, discipline_score=?, discipline_details=?, fees=?, tags=?, is_off_plan=?, risk_respected=?, sl_moved=?, has_screenshot=? WHERE id=? AND user_id=?`, [pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, JSON.stringify(disciplineDetails), fees, tags, isOffPlan?1:0, riskRespected?1:0, slMoved?1:0, hasScreenshot?1:0, req.params.id, req.user.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: req.params.id, ...req.body });
-    });
-});
-
-app.delete('/api/trades/:id', authenticateToken, (req, res) => {
-    db.run(`DELETE FROM trades WHERE id=? AND user_id=?`, [req.params.id, req.user.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Supprimé" });
-    });
-});
-
-// --- TODO LIST ROUTES ---
-const shouldReset = (frequency, lastResetStr) => {
-    if (frequency === 'ONCE') return false;
-    if (!lastResetStr) return true;
-    const now = new Date();
-    const last = new Date(lastResetStr);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (frequency === 'DAILY') return today > new Date(last.getFullYear(), last.getMonth(), last.getDate());
-    if (frequency === 'WEEKLY') {
-        const oneJan = new Date(now.getFullYear(), 0, 1);
-        const currentWeek = Math.ceil((((now - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
-        const lastOneJan = new Date(last.getFullYear(), 0, 1);
-        const lastWeek = Math.ceil((((last - lastOneJan) / 86400000) + lastOneJan.getDay() + 1) / 7);
-        return currentWeek !== lastWeek || now.getFullYear() !== last.getFullYear();
-    }
-    if (frequency === 'MONTHLY') return now.getMonth() !== last.getMonth() || now.getFullYear() !== last.getFullYear();
-    if (frequency === 'YEARLY') return now.getFullYear() !== last.getFullYear();
-    return false;
-};
-
+// --- TODO LIST ROUTES (Restrictions intégrées) ---
 app.get('/api/todo-lists', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM todo_lists WHERE user_id = ? ORDER BY position ASC, id ASC`, [req.user.id], async (err, lists) => {
         if (err) return res.status(500).json({ error: err.message });
-        const todayStr = new Date().toISOString().split('T')[0];
         const result = [];
         for (const list of lists) {
-            if (shouldReset(list.frequency, list.last_reset)) {
-                await new Promise(resolve => db.run(`UPDATE todos SET is_completed = 0 WHERE list_id = ?`, [list.id], resolve));
-                await new Promise(resolve => db.run(`UPDATE todo_lists SET last_reset = ? WHERE id = ?`, [todayStr, list.id], resolve));
-                list.last_reset = todayStr;
-            }
-            const tasks = await new Promise((resolve, reject) => {
-                db.all(`SELECT * FROM todos WHERE list_id = ?`, [list.id], (err, rows) => { if (err) reject(err); else resolve(rows); });
-            });
+            const tasks = await new Promise((resolve) => db.all(`SELECT * FROM todos WHERE list_id = ?`, [list.id], (e, r) => resolve(r || [])));
             result.push({ ...list, tasks });
         }
         res.json(result);
@@ -288,153 +142,100 @@ app.get('/api/todo-lists', authenticateToken, (req, res) => {
 });
 
 app.post('/api/todo-lists', authenticateToken, (req, res) => {
-    const { title, icon, color, frequency } = req.body;
-    const date = new Date().toISOString().split('T')[0];
-    db.get(`SELECT MAX(position) as maxPos FROM todo_lists WHERE user_id = ?`, [req.user.id], (err, row) => {
-        const nextPos = (row && row.maxPos !== null) ? row.maxPos + 1 : 0;
-        db.run(`INSERT INTO todo_lists (user_id, title, icon, color, frequency, last_reset, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user.id, title, icon, color, frequency, date, date, nextPos],
-            function(err) {
+    let { title, icon, color, frequency } = req.body;
+    if (req.user.is_pro === 0) {
+        color = 'indigo'; icon = null; // Force default
+        db.get(`SELECT COUNT(*) as count FROM todo_lists WHERE user_id = ?`, [req.user.id], (err, row) => {
+            if (row.count >= 3) return res.status(403).json({ error: "Limite de 3 listes atteinte." });
+            insertList();
+        });
+    } else {
+        insertList();
+    }
+    function insertList() {
+        const date = new Date().toISOString().split('T')[0];
+        db.get(`SELECT MAX(position) as maxPos FROM todo_lists WHERE user_id = ?`, [req.user.id], (err, row) => {
+            const nextPos = (row && row.maxPos !== null) ? row.maxPos + 1 : 0;
+            db.run(`INSERT INTO todo_lists (user_id, title, icon, color, frequency, last_reset, created_at, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [req.user.id, title, icon, color, frequency, date, date, nextPos], function(err) {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ id: this.lastID, title, icon, color, frequency, position: nextPos, tasks: [] });
-            }
-        );
-    });
+            });
+        });
+    }
+});
+
+// NOUVELLE ROUTE PUT POUR MODIFIER LA LISTE
+app.put('/api/todo-lists/:id', authenticateToken, (req, res) => {
+    let { title, icon, color, frequency } = req.body;
+    // Restriction Free : Force les valeurs par défaut
+    if (req.user.is_pro === 0) {
+        color = 'indigo';
+        icon = null;
+    }
+    db.run(`UPDATE todo_lists SET title = ?, icon = ?, color = ?, frequency = ? WHERE id = ? AND user_id = ?`,
+        [title, icon, color, frequency, req.params.id, req.user.id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: parseInt(req.params.id), title, icon, color, frequency });
+        }
+    );
 });
 
 app.put('/api/todo-lists/reorder', authenticateToken, (req, res) => {
     const { lists } = req.body;
-    if (!lists || !Array.isArray(lists)) return res.status(400).json({ error: "Invalid data" });
     db.serialize(() => {
         const stmt = db.prepare(`UPDATE todo_lists SET position = ? WHERE id = ? AND user_id = ?`);
-        lists.forEach((item, index) => { stmt.run(index, item.id, req.user.id); });
-        stmt.finalize((err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Reordered successfully" });
-        });
+        lists.forEach((item, index) => stmt.run(index, item.id, req.user.id));
+        stmt.finalize(() => res.json({ message: "Reordered" }));
     });
 });
 
 app.delete('/api/todo-lists/:id', authenticateToken, (req, res) => {
     db.serialize(() => {
         db.run(`DELETE FROM todos WHERE list_id = ?`, [req.params.id]);
-        db.run(`DELETE FROM todo_lists WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Liste supprimée" });
-        });
+        db.run(`DELETE FROM todo_lists WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], () => res.json({ message: "Deleted" }));
     });
 });
 
 app.post('/api/todos', authenticateToken, (req, res) => {
     const { list_id, text } = req.body;
-    const date = new Date().toISOString();
-    if(!list_id) return res.status(400).json({error: "list_id manquant"});
-    db.run(`INSERT INTO todos (list_id, user_id, text, is_completed, created_at) VALUES (?, ?, ?, 0, ?)`, [list_id, req.user.id, text, date], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: this.lastID, list_id, text, is_completed: 0 });
-    });
+    if (req.user.is_pro === 0) {
+        db.get(`SELECT COUNT(*) as count FROM todos WHERE list_id = ?`, [list_id], (err, row) => {
+            if (row.count >= 10) return res.status(403).json({ error: "Limite de 10 tâches atteinte." });
+            insertTodo();
+        });
+    } else { insertTodo(); }
+    function insertTodo() {
+        db.run(`INSERT INTO todos (list_id, user_id, text, is_completed, created_at) VALUES (?, ?, ?, 0, ?)`, [list_id, req.user.id, text, new Date().toISOString()], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: this.lastID, list_id, text, is_completed: 0 });
+        });
+    }
 });
 
 app.put('/api/todos/:id', authenticateToken, (req, res) => {
     const { is_completed } = req.body;
-    db.run(`UPDATE todos SET is_completed = ? WHERE id = ?`, [is_completed, req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Updated" });
-    });
+    db.run(`UPDATE todos SET is_completed = ? WHERE id = ?`, [is_completed, req.params.id], () => res.json({ message: "Updated" }));
 });
-
 app.delete('/api/todos/:id', authenticateToken, (req, res) => {
-    db.run(`DELETE FROM todos WHERE id = ?`, [req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ message: "Deleted" });
-    });
+    db.run(`DELETE FROM todos WHERE id = ?`, [req.params.id], () => res.json({ message: "Deleted" }));
 });
 
-// --- UPDATES & NOTIFICATIONS ---
-app.get('/api/notifications', authenticateToken, (req, res) => { db.all(`SELECT * FROM notifications WHERE user_id = ? ORDER BY id DESC`, [req.user.id], (err, rows) => res.json(rows)); });
-app.put('/api/notifications/read/:id', authenticateToken, (req, res) => { db.run(`UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], (err) => res.json({ message: "Read" })); });
-app.put('/api/notifications/read', authenticateToken, (req, res) => { db.run(`UPDATE notifications SET is_read = 1 WHERE user_id = ?`, [req.user.id], (err) => res.json({ message: "All Read" })); });
-app.get('/api/updates', authenticateToken, (req, res) => { db.all(`SELECT * FROM updates ORDER BY date DESC`, [], (err, rows) => res.json(rows)); });
-
-// --- ADMIN PANEL ROUTES (CORRIGÉS ET COMPLÉTÉS) ---
-
-// 1. GET ALL USERS (CORRIGÉ : Vérifie le statut en DB, pas dans le token)
-app.get('/api/admin/users', authenticateToken, (req, res) => {
-    // On vérifie en DB si l'utilisateur est vraiment admin (is_pro = 7)
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user) return res.sendStatus(403);
-        if (user.is_pro !== 7) return res.sendStatus(403); // Si pas admin, on bloque
-
-        // Si admin, on renvoie tous les users
-        db.all("SELECT * FROM users", [], (err, rows) => res.json(rows));
-    });
-});
-
-// 2. UPDATE USER (Manquant dans ton code original)
-app.put('/api/admin/users/:id', authenticateToken, (req, res) => {
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user || user.is_pro !== 7) return res.sendStatus(403);
-
-        const { first_name, last_name, email, is_pro } = req.body;
-        db.run(`UPDATE users SET first_name=?, last_name=?, email=?, is_pro=? WHERE id=?`,
-            [first_name, last_name, email, is_pro, req.params.id],
-            (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ message: "User updated" });
-            }
-        );
-    });
-});
-
-// 3. DELETE USER (Manquant dans ton code original)
-app.delete('/api/admin/users/:id', authenticateToken, (req, res) => {
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user || user.is_pro !== 7) return res.sendStatus(403);
-
-        db.serialize(() => {
-            db.run(`DELETE FROM trades WHERE user_id = ?`, [req.params.id]);
-            db.run(`DELETE FROM accounts WHERE user_id = ?`, [req.params.id]);
-            db.run(`DELETE FROM users WHERE id = ?`, [req.params.id], (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ message: "User deleted" });
-            });
-        });
-    });
-});
-
-// 4. CREATE UPDATE (Manquant)
-app.post('/api/admin/updates', authenticateToken, (req, res) => {
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user || user.is_pro !== 7) return res.sendStatus(403);
-        const { title, content, type, date } = req.body;
-        db.run(`INSERT INTO updates (title, content, type, date) VALUES (?,?,?,?)`, [title, content, type, date], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ id: this.lastID, ...req.body });
-        });
-    });
-});
-
-// 5. UPDATE UPDATE (Manquant)
-app.put('/api/admin/updates/:id', authenticateToken, (req, res) => {
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user || user.is_pro !== 7) return res.sendStatus(403);
-        const { title, content, type, date } = req.body;
-        db.run(`UPDATE updates SET title=?, content=?, type=?, date=? WHERE id=?`, [title, content, type, date, req.params.id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Update modifié" });
-        });
-    });
-});
-
-// 6. DELETE UPDATE (Manquant)
-app.delete('/api/admin/updates/:id', authenticateToken, (req, res) => {
-    db.get("SELECT is_pro FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (err || !user || user.is_pro !== 7) return res.sendStatus(403);
-        db.run(`DELETE FROM updates WHERE id=?`, [req.params.id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Update supprimé" });
-        });
-    });
-});
+// ... (Routes User/Accounts/Trades/Admin standard...)
+app.put('/api/user/update', authenticateToken, (req, res) => { const { first_name, last_name, email, password, default_risk, preferences, colors, is_pro } = req.body; let u=[], p=[]; if(first_name) {u.push("first_name=?"); p.push(first_name)} if(last_name){u.push("last_name=?"); p.push(last_name)} if(email){u.push("email=?"); p.push(email)} if(default_risk){u.push("default_risk=?"); p.push(default_risk)} if(preferences){u.push("preferences=?"); p.push(JSON.stringify(preferences))} if(colors){u.push("colors=?"); p.push(JSON.stringify(colors))} if(password){u.push("password=?"); p.push(bcrypt.hashSync(password,8))} p.push(req.user.id); db.run(`UPDATE users SET ${u.join(',')} WHERE id=?`, p, () => { db.get(`SELECT * FROM users WHERE id=?`, [req.user.id], (e,user) => res.json({ message: "Updated", user: {...user, password:'', preferences: JSON.parse(user.preferences), colors: JSON.parse(user.colors)} })); }); });
+app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), (req,res) => { const url=`/uploads/${req.file.filename}`; db.run(`UPDATE users SET avatar_url=? WHERE id=?`, [url, req.user.id], ()=>res.json({message:"OK", avatar_url:url})); });
+app.get('/api/accounts', authenticateToken, (req, res) => { db.all(`SELECT * FROM accounts WHERE user_id=?`, [req.user.id], (e,r) => res.json(r)); });
+app.post('/api/accounts', authenticateToken, (req, res) => { const {name, description, broker, platform, color, currency, max_risk, default_rr} = req.body; db.run(`INSERT INTO accounts (user_id, name, description, broker, platform, color, currency, max_risk, default_rr, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, [req.user.id, name, description, broker, platform, color, currency, max_risk, default_rr, new Date().toISOString()], function(){ res.json({id:this.lastID, ...req.body}); }); });
+app.put('/api/accounts/:id', authenticateToken, (req, res) => { const {name, description, broker, platform, color, currency, max_risk, default_rr} = req.body; db.run(`UPDATE accounts SET name=?, description=?, broker=?, platform=?, color=?, currency=?, max_risk=?, default_rr=? WHERE id=?`, [name, description, broker, platform, color, currency, max_risk, default_rr, req.params.id], () => res.json({message:"Updated"})); });
+app.delete('/api/accounts/:id', authenticateToken, (req, res) => { db.serialize(() => { db.run(`DELETE FROM trades WHERE account_id=?`, [req.params.id]); db.run(`DELETE FROM accounts WHERE id=?`, [req.params.id], () => res.json({message:"Deleted"})); }); });
+app.get('/api/trades', authenticateToken, (req,res) => { const sql = req.query.accountId ? `SELECT * FROM trades WHERE user_id=? AND account_id=? ORDER BY date DESC` : `SELECT * FROM trades WHERE user_id=? ORDER BY date DESC`; const params = req.query.accountId ? [req.user.id, req.query.accountId] : [req.user.id]; db.all(sql, params, (e,r) => res.json(r.map(t => ({...t, disciplineScore: t.discipline_score, disciplineDetails: JSON.parse(t.discipline_details || '{}'), isOffPlan: !!t.is_off_plan, riskRespected: !!t.risk_respected, slMoved: !!t.sl_moved})))); });
+app.post('/api/trades', authenticateToken, (req,res) => { const {account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved} = req.body; db.run(`INSERT INTO trades (user_id, account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, discipline_score, discipline_details, fees, tags, is_off_plan, risk_respected, sl_moved) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [req.user.id, account_id, pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, JSON.stringify(disciplineDetails), fees, tags, isOffPlan?1:0, riskRespected?1:0, slMoved?1:0], function(){ res.json({id:this.lastID, ...req.body}); }); });
+app.put('/api/trades/:id', authenticateToken, (req,res) => { const {pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, disciplineDetails, fees, tags, isOffPlan, riskRespected, slMoved} = req.body; db.run(`UPDATE trades SET pair=?, date=?, time=?, type=?, entry=?, exit=?, sl=?, tp=?, lot=?, profit=?, discipline_score=?, discipline_details=?, fees=?, tags=?, is_off_plan=?, risk_respected=?, sl_moved=? WHERE id=?`, [pair, date, time, type, entry, exit, sl, tp, lot, profit, disciplineScore, JSON.stringify(disciplineDetails), fees, tags, isOffPlan?1:0, riskRespected?1:0, slMoved?1:0, req.params.id], () => res.json({id:req.params.id, ...req.body})); });
+app.delete('/api/trades/:id', authenticateToken, (req,res) => { db.run(`DELETE FROM trades WHERE id=?`, [req.params.id], () => res.json({message:"Deleted"})); });
+app.get('/api/notifications', authenticateToken, (req,res) => db.all(`SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC`, [req.user.id], (e,r) => res.json(r)));
+app.put('/api/notifications/read', authenticateToken, (req,res) => db.run(`UPDATE notifications SET is_read=1 WHERE user_id=?`, [req.user.id], () => res.json({message:"Read"})));
+app.get('/api/updates', authenticateToken, (req,res) => db.all(`SELECT * FROM updates ORDER BY date DESC`, [], (e,r) => res.json(r)));
+app.get('/api/admin/users', authenticateToken, (req,res) => { db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (e,u) => { if(u?.is_pro===7) db.all("SELECT * FROM users", [], (e,r)=>res.json(r)); else res.sendStatus(403); }); });
+app.post('/api/admin/test-email', authenticateToken, (req,res) => { db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], async (e,u) => { if(u?.is_pro===7) { try { await transporter.sendMail({from:'"Test"<no-reply@test.com>', to:req.user.email, subject:"Test Email", html:"<p>Ceci est un test</p>", attachments: [{ filename: 'logo.png', path: path.join(__dirname, 'uploads', 'logo.png'), cid: 'logo' }]}); res.json({message:"Envoyé"}); } catch(err) { res.status(500).json({error:"Erreur envoi"}); } } else res.sendStatus(403); }); });
 
 app.listen(PORT, () => console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`));

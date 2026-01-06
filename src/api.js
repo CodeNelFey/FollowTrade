@@ -30,6 +30,7 @@ export const api = {
 
     login: (email, password) => request('/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
     register: (email, password, first_name, last_name) => request('/register', { method: 'POST', body: JSON.stringify({ email, password, first_name, last_name }) }),
+    verifyEmail: (email, code) => request('/verify-email', { method: 'POST', body: JSON.stringify({ email, code }) }),
     updateUser: (data) => request('/user/update', { method: 'PUT', body: JSON.stringify(data) }),
     uploadAvatar: (formData) => request('/user/avatar', { method: 'POST', body: formData }),
 
@@ -46,8 +47,9 @@ export const api = {
     // --- TODOLIST ---
     getTodoLists: () => request('/todo-lists'),
     createTodoList: (data) => request('/todo-lists', { method: 'POST', body: JSON.stringify(data) }),
+    // NOUVELLE FONCTION POUR MODIFIER UNE LISTE
+    updateTodoList: (id, data) => request(`/todo-lists/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteTodoList: (id) => request(`/todo-lists/${id}`, { method: 'DELETE' }),
-    // NOUVELLE MÉTHODE
     reorderTodoLists: (lists) => request('/todo-lists/reorder', { method: 'PUT', body: JSON.stringify({ lists }) }),
 
     addTodo: (data) => request('/todos', { method: 'POST', body: JSON.stringify(data) }),
@@ -61,5 +63,10 @@ export const api = {
 
     adminGetAllUsers: () => request('/admin/users'),
     adminUpdateUser: (id, data) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' })
+    adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+    adminCreateUpdate: (data) => request('/admin/updates', { method: 'POST', body: JSON.stringify(data) }),
+    adminUpdateUpdate: (id, data) => request(`/admin/updates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    adminDeleteUpdate: (id) => request(`/admin/updates/${id}`, { method: 'DELETE' }),
+
+    adminTestEmail: (type) => request('/admin/test-email', { method: 'POST', body: JSON.stringify({ type }) }),
 };

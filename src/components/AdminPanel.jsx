@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Plus } from 'lucide-react';
+import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Plus, Mail, Send, Lock } from 'lucide-react';
 
 const AdminPanel = () => {
     // URL de ton backend (à modifier si tu mets en ligne plus tard)
@@ -21,15 +21,16 @@ const AdminPanel = () => {
     const [updateForm, setUpdateForm] = useState({ title: '', content: '', type: 'INFO', date: new Date().toISOString().split('T')[0] });
     const [editingUpdateId, setEditingUpdateId] = useState(null);
 
+    // EMAILS STATE
+    const [sendingEmail, setSendingEmail] = useState(null);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Fonction pour corriger l'URL de l'image
     const getAvatarUrl = (url) => {
         if (!url) return null;
-        // Si c'est déjà une URL complète ou un blob (upload local), on laisse tel quel
         if (url.startsWith('http') || url.startsWith('blob:')) return url;
-        // Sinon, c'est un chemin relatif du serveur, on ajoute l'URL du serveur devant
         return `${API_URL}${url}`;
     };
 
@@ -72,7 +73,7 @@ const AdminPanel = () => {
         e.preventDefault();
         try {
             await api.adminUpdateUser(editingUser.id, formData);
-            await loadUsers(); // Recharger pour voir les modifs
+            await loadUsers();
             setEditingUser(null);
         } catch (e) {
             console.error(e);
@@ -91,7 +92,6 @@ const AdminPanel = () => {
 
     const handleEditUserClick = (user) => {
         setEditingUser(user);
-        // On copie l'utilisateur pour ne pas modifier l'original directement
         setFormData({ ...user });
     };
 
@@ -122,6 +122,19 @@ const AdminPanel = () => {
         setIsUpdateModalOpen(true);
     };
 
+    // --- FONCTION DE TEST EMAIL ---
+    const handleTestEmail = async (type) => {
+        setSendingEmail(type);
+        try {
+            await api.adminTestEmail(type);
+            alert(`Email ${type} envoyé avec succès ! Vérifie ta boîte mail.`);
+        } catch (e) {
+            alert("Erreur lors de l'envoi : " + (e.response?.data?.error || e.message));
+        } finally {
+            setSendingEmail(null);
+        }
+    };
+
     const renderBadge = (is_pro) => {
         if (is_pro === 7) return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white border border-purple-400/30 shadow-sm w-fit justify-center"><ShieldAlert size={12} fill="currentColor" /> ADMIN</div>;
         if (is_pro === 2) return <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white border border-emerald-400/30 shadow-sm w-fit justify-center"><Sparkles size={12} fill="currentColor" /> VIP</div>;
@@ -136,9 +149,10 @@ const AdminPanel = () => {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><ShieldAlert className="text-purple-500" /> Panel Administrateur</h2>
-                <div className="flex gap-2 bg-gray-100 dark:bg-white/5 p-1 rounded-xl">
-                    <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-white dark:bg-neutral-800 shadow text-indigo-600' : 'text-gray-500'}`}>Utilisateurs</button>
-                    <button onClick={() => setActiveTab('updates')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'updates' ? 'bg-white dark:bg-neutral-800 shadow text-indigo-600' : 'text-gray-500'}`}>Mises à jour</button>
+                <div className="flex gap-2 bg-gray-100 dark:bg-white/5 p-1 rounded-xl overflow-x-auto">
+                    <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-white dark:bg-neutral-800 shadow text-indigo-600' : 'text-gray-500'}`}>Utilisateurs</button>
+                    <button onClick={() => setActiveTab('updates')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'updates' ? 'bg-white dark:bg-neutral-800 shadow text-indigo-600' : 'text-gray-500'}`}>Mises à jour</button>
+                    <button onClick={() => setActiveTab('emails')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'emails' ? 'bg-white dark:bg-neutral-800 shadow text-indigo-600' : 'text-gray-500'}`}>Emails & Tests</button>
                 </div>
             </div>
 
@@ -155,7 +169,6 @@ const AdminPanel = () => {
                             <div key={u.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-5 rounded-2xl border border-white/20 shadow-sm">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
-                                        {/* CORRECTION IMAGE ICI */}
                                         {u.avatar_url ? (
                                             <img src={getAvatarUrl(u.avatar_url)} className="w-full h-full object-cover" alt="Avatar" />
                                         ) : (
@@ -196,7 +209,6 @@ const AdminPanel = () => {
                                     <tr key={u.id} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-neutral-700 flex-shrink-0">
-                                                {/* CORRECTION IMAGE ICI */}
                                                 {u.avatar_url ? (
                                                     <img src={getAvatarUrl(u.avatar_url)} className="w-full h-full object-cover" alt="Avatar" />
                                                 ) : (
@@ -238,6 +250,56 @@ const AdminPanel = () => {
                         ))}
                     </div>
                 </>
+            )}
+
+            {/* --- VUE EMAILS --- */}
+            {activeTab === 'emails' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Carte Bienvenue */}
+                    <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-sm flex flex-col items-center text-center">
+                        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4"><Sparkles size={24}/></div>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">Bienvenue</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">Envoyé lors de l'inscription d'un nouvel utilisateur.</p>
+                        <button
+                            onClick={() => handleTestEmail('WELCOME')}
+                            disabled={!!sendingEmail}
+                            className="w-full py-2.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 hover:border-indigo-500 dark:hover:border-indigo-500 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2 group"
+                        >
+                            {sendingEmail === 'WELCOME' ? <div className="animate-spin w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"/> : <Send size={16} className="text-indigo-500 group-hover:translate-x-1 transition-transform"/>}
+                            Envoyer un test
+                        </button>
+                    </div>
+
+                    {/* Carte Reset Password */}
+                    <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-sm flex flex-col items-center text-center">
+                        <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-4"><Lock size={24}/></div>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">Mot de passe oublié</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">Contient le lien sécurisé pour réinitialiser le mot de passe.</p>
+                        <button
+                            onClick={() => handleTestEmail('RESET_PASSWORD')}
+                            disabled={!!sendingEmail}
+                            className="w-full py-2.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 hover:border-indigo-500 dark:hover:border-indigo-500 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2 group"
+                        >
+                            {sendingEmail === 'RESET_PASSWORD' ? <div className="animate-spin w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"/> : <Send size={16} className="text-indigo-500 group-hover:translate-x-1 transition-transform"/>}
+                            Envoyer un test
+                        </button>
+                    </div>
+
+                    {/* Carte Alerte */}
+                    <div className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-sm flex flex-col items-center text-center">
+                        <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4"><ShieldAlert size={24}/></div>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">Alerte Sécurité</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">Envoyé lors d'une connexion suspecte ou changement important.</p>
+                        <button
+                            onClick={() => handleTestEmail('ALERT')}
+                            disabled={!!sendingEmail}
+                            className="w-full py-2.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 hover:border-indigo-500 dark:hover:border-indigo-500 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2 group"
+                        >
+                            {sendingEmail === 'ALERT' ? <div className="animate-spin w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"/> : <Send size={16} className="text-indigo-500 group-hover:translate-x-1 transition-transform"/>}
+                            Envoyer un test
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* --- MODALE MODIFICATION UTILISATEUR (Responsive) --- */}
