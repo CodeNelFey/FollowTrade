@@ -45,46 +45,42 @@
 .animate-float-candle { animation: float-candle 6s ease-in-out infinite; }
 
 /* --- CONFIGURATION IOS & COULEURS --- */
+/* --- CONFIGURATION IOS & PLEIN ÉCRAN --- */
 :root {
-    /* Valeur par défaut (changée dynamiquement par React dans App.jsx) */
     --bg-global: #000000;
 }
 
 html {
-    /* C'est cette variable qui contrôle la couleur derrière la barre d'état */
+    /* Force le fond à être celui de l'app */
     background-color: var(--bg-global);
-    width: 100%;
-    height: 100%;
-    overscroll-behavior: none;
 
-    /* Transition fluide lors du changement de thème (Dark/Light) */
-    transition: background-color 0.3s ease-in-out;
+    /* Force la hauteur à prendre TOUT l'écran, y compris sous la barre système */
+    height: 100dvh;
+    width: 100vw;
+
+    /* Empêche le rebond élastique d'iOS */
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
     margin: 0;
     padding: 0;
+    /* Idem pour le body */
+    min-height: 100dvh;
     width: 100%;
-    height: 100%;
     background-color: var(--bg-global);
-    overscroll-behavior: none;
+    overscroll-behavior-y: none;
 
-    /* IMPORTANT : On supprime 'color: white' ici.
-       La couleur du texte est gérée par Tailwind (text-gray-900 dark:text-white)
-       dans les composants pour supporter le mode Clair. */
-
-    /* Rendu de police plus net sur Mac/iOS */
+    /* Lissage des polices */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-
-    transition: background-color 0.3s ease-in-out;
 }
 
 #root {
-    height: 100%;
+    /* Le conteneur React doit aussi tout remplir */
+    height: 100dvh;
     width: 100%;
-    /* Le root hérite aussi de la couleur pour éviter les trous blancs lors du chargement */
     background-color: var(--bg-global);
-    overflow-x: hidden;
-    transition: background-color 0.3s ease-in-out;
+    isolation: isolate;
 }
