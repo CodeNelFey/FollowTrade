@@ -7,7 +7,8 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
         { id: 'journal', icon: LayoutDashboard, label: 'Journal' },
         { id: 'routine', icon: ClipboardList, label: 'Routine' },
         { id: 'graphs', icon: LineChart, label: 'Analyses', isPro: true },
-        { id: 'simulator', icon: TrendingUp, label: 'Simu' }, // <-- AJOUT DU SIMULATEUR
+        // MODIFICATION ICI : isPro: true ajouté pour verrouiller le simulateur
+        { id: 'simulator', icon: TrendingUp, label: 'Simu', isPro: true },
         { id: 'calendar', icon: CalendarIcon, label: 'Agenda', isPro: true },
         { id: 'calculator', icon: Calculator, label: 'Calc' },
         { id: 'updates', icon: Megaphone, label: 'News', hasNotif: true },

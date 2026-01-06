@@ -26,6 +26,7 @@ import AccountFormModal from './components/AccountFormModal';
 import TodoView from './components/TodoView';
 import ShareTradeModal from './components/ShareTradeModal';
 import SimulatorView from './components/SimulatorView';
+
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
 const PAIRS = [
@@ -150,7 +151,7 @@ function App() {
             }
             if (!extracted.sl) { const sl = line.match(/(?:S|5)[\s\/\\I\|\.]*L[:\s]*([\d\.]+)/); if (sl) extracted.sl = sl[1]; }
             if (!extracted.tp) { const tp = line.match(/T[\s\/\\I\|\.]*P[:\s]*([\d\.]+)/); if (tp) extracted.tp = tp[1]; }
-            const chargesMatch = line.match(/(?:CHARGES|COMMISSION|C\s*H\s*A\s*R\s*G\s*E\s*S)[:\s]*([-]?[\d\.]+)/); if (chargesMatch) extracted.fees += Math.abs(parseFloat(chargesMatch[1]));
+            const chargesMatch = line.match(/(?:CHARGES|COMMISSION|C\s*H\s*A\s*R\s*G\s*E\s*A)[:\s]*([-]?[\d\.]+)/); if (chargesMatch) extracted.fees += Math.abs(parseFloat(chargesMatch[1]));
             const swapMatch = line.match(/(?:SWAP|S\s*W\s*A\s*P)[:\s]*([-]?[\d\.]+)/); if (swapMatch) extracted.fees += Math.abs(parseFloat(swapMatch[1]));
             if (!extracted.entry && !line.includes(extracted.date)) {
                 if (line.match(/(?:S|5)[\s\/\\I\|\.]*L/) || line.match(/T[\s\/\\I\|\.]*P/)) continue;
@@ -271,7 +272,25 @@ function App() {
     const handleLogout = () => { api.removeToken(); setUser(null); setTrades([]); setAccounts([]); setCurrentAccount(null); setActiveTab('journal'); setViewMode('home'); };
     const handleUpdateUser = async (updatedData) => { const res = await api.updateUser(updatedData); setUser(res.user); api.setUser(res.user); };
     const navigateToAuth = (isSignUp = false) => { setAuthInitialState(isSignUp); setViewMode('auth'); };
-    const handleNavClick = (tab) => { const freeTabs = ['journal', 'calculator', 'settings', 'updates', 'routine']; if (tab === 'updates') { setHasNewUpdates(false); if (latestUpdateId > 0) localStorage.setItem('last_read_update', latestUpdateId.toString()); } if (user?.is_pro >= 1 || freeTabs.includes(tab)) setActiveTab(tab); else setShowUpgradeModal(true); };
+
+    // --- GESTION NAVIGATION ET ACCES ---
+    const handleNavClick = (tab) => {
+        // Liste des onglets accessibles aux utilisateurs gratuits
+        const freeTabs = ['journal', 'calculator', 'settings', 'updates', 'routine'];
+
+        if (tab === 'updates') {
+            setHasNewUpdates(false);
+            if (latestUpdateId > 0) localStorage.setItem('last_read_update', latestUpdateId.toString());
+        }
+
+        // Si l'utilisateur est PRO ou si l'onglet est gratuit, on navigue
+        // Sinon (pour 'simulator', 'graphs', 'calendar'), on montre la modal
+        if (user?.is_pro >= 1 || freeTabs.includes(tab)) {
+            setActiveTab(tab);
+        } else {
+            setShowUpgradeModal(true);
+        }
+    };
 
     const handleOpenAddModal = () => { setEditingTrade(null); setIsModalOpen(true); };
     const handleOpenEditModal = (trade) => { setEditingTrade(trade); setIsModalOpen(true); };
