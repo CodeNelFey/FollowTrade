@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, Crown, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Megaphone, LineChart, Calendar as CalendarIcon, Calculator, Crown, ClipboardList, TrendingUp } from 'lucide-react';
 
 const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
 
@@ -7,7 +7,8 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
         { id: 'journal', icon: LayoutDashboard, label: 'Journal' },
         { id: 'routine', icon: ClipboardList, label: 'Routine' },
         { id: 'graphs', icon: LineChart, label: 'Analyses', isPro: true },
-        { id: 'calendar', icon: CalendarIcon, label: 'Calendrier', isPro: true },
+        { id: 'simulator', icon: TrendingUp, label: 'Simu' }, // <-- AJOUT DU SIMULATEUR
+        { id: 'calendar', icon: CalendarIcon, label: 'Agenda', isPro: true },
         { id: 'calculator', icon: Calculator, label: 'Calc' },
         { id: 'updates', icon: Megaphone, label: 'News', hasNotif: true },
     ];
@@ -21,11 +22,12 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
            - w-full : Pleine largeur.
            - bg-white dark:bg-black : Fond Noir pur en mode sombre pour fusionner avec la barre iPhone.
            - border-t : Petite séparation subtile en haut.
-           - pb-[env(safe-area-inset-bottom)] : Étend le fond noir sous la barre de swipe, mais pousse les icônes vers le haut.
+           - pb-[env(safe-area-inset-bottom)] : Étend le fond noir sous la barre de swipe.
         */
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-black border-t border-gray-200 dark:border-neutral-900 pb-[env(safe-area-inset-bottom)] transition-colors duration-300">
 
-            <div className="flex justify-between items-center px-2 py-3">
+            {/* overflow-x-auto permet de scroller horizontalement si l'écran est trop petit pour toutes les icônes */}
+            <div className="flex justify-between items-center px-1 py-3 overflow-x-auto scrollbar-hide">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -35,12 +37,12 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
                         <button
                             key={item.id}
                             onClick={() => onNavClick(item.id)}
-                            className="relative group flex-1 flex flex-col items-center justify-center transition-all duration-200 active:scale-95 py-1"
+                            className="relative group flex-1 flex flex-col items-center justify-center transition-all duration-200 active:scale-95 py-1 min-w-[50px]"
                         >
                             {/* Indicateur Actif (Lueur au-dessus) */}
                             {isActive && (
                                 <div
-                                    className="absolute -top-[13px] w-10 h-1 rounded-b-full shadow-[0_0_10px_rgba(79,70,229,0.5)] transition-all duration-300"
+                                    className="absolute -top-[13px] w-8 h-1 rounded-b-full shadow-[0_0_10px_rgba(79,70,229,0.5)] transition-all duration-300"
                                     style={{ backgroundColor: activeColor, boxShadow: `0 0 12px ${activeColor}` }}
                                 />
                             )}
@@ -48,7 +50,7 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
                             {/* Icône */}
                             <div className={`relative p-1 rounded-xl transition-all duration-300 ${isActive ? '-translate-y-1' : ''}`}>
                                 <Icon
-                                    size={24}
+                                    size={22}
                                     className={`transition-colors duration-300 ${
                                         isActive
                                             ? 'text-gray-900 dark:text-white'
@@ -73,7 +75,7 @@ const MobileMenu = ({ activeTab, onNavClick, user, hasNewUpdates, colors }) => {
                                 )}
                             </div>
 
-                            {/* Label (affiché uniquement si actif pour un look épuré) */}
+                            {/* Label */}
                             <span
                                 className={`text-[9px] font-bold mt-0.5 transition-all duration-300 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 hidden'}`}
                                 style={{ color: activeColor }}
