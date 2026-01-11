@@ -7,7 +7,7 @@ const BASE_URL = (hostname === 'localhost' || hostname.startsWith('192.168') || 
 export const config = {
     // 1. L'URL de ton Backend
     // En prod c'est vide (car même domaine), en dev c'est localhost
-    API_URL: BASE_URL + ":3000",
+    API_URL: BASE_URL,
 
     // 2. Tes IDs Stripe
     STRIPE: {
