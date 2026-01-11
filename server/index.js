@@ -479,12 +479,16 @@ app.get('/api/updates', authenticateToken, (req, res) => db.all("SELECT * FROM u
 // 4. SERVIR LE SITE (PRODUCTION) - A LA FIN
 // ==================================================================
 app.use(express.static(path.join(__dirname, 'dist')));
-app.get('/.*/', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-    } else {
-        res.status(404).json({ error: "API Route not found" });
+app.use((req, res) => {
+    // Si la requête commence par /api mais n'a pas été trouvée avant -> Erreur 404 JSON
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: "API Route not found" });
     }
+
+    // Sinon (pour le site React), on renvoie index.html
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
+
+app.listen(PORT, () => console.log(`🚀 Serveur démarré sur port ${PORT}`));
 
 app.listen(PORT, () => console.log(`🚀 Serveur démarré sur port ${PORT}`));
