@@ -1,7 +1,9 @@
 // src/config.js
 
 // Vite détecte automatiquement si on est en "build" (Production) ou en "dev" (Local)
-export const BASE_URL = (hostname === 'localhost' || hostname.startsWith('192.168') || hostname.startsWith('10.')) ? `http://${hostname}:3000` : '';
+const hostname = window.location.hostname;
+const BASE_URL = (hostname === 'localhost' || hostname.startsWith('192.168') || hostname.startsWith('10.')) ? `http://${hostname}:3000` : '';
+
 export const config = {
     // 1. L'URL de ton Backend
     // En prod c'est vide (car même domaine), en dev c'est localhost
