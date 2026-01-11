@@ -5,7 +5,7 @@ import {config} from "../config.js";
 
 const AdminPanel = () => {
     // URL backend (dynamique selon prod/dev)
-    export const BASE_URL = config.API_URL;
+    const BASE_URL = config.API_URL;
     const API_URL = `${BASE_URL}:3000`;
 
     const [activeTab, setActiveTab] = useState('users');
