@@ -12,9 +12,7 @@ export const config = {
     // 2. Tes IDs Stripe
     STRIPE: {
         // Le système choisit automatiquement le bon ID selon le mode
-        PRO_PLAN_ID: isProduction
-            ? 'price_1SoR585cfeKwJTEVIK9rQHjx'  // <--- Mets ton ID PROD (Live) ici
-            : 'price_1SoRLa5cfeKwJTEVIioxQlt0', // <--- Mets ton ID TEST ici
+        PRO_PLAN_ID: 'price_1SoR585cfeKwJTEVIK9rQHjx'
 
     }
 };
