@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // AJOUT useRef
 import { Sun, Moon, Wallet, Plus, Settings, Bell, ShieldAlert, Sparkles, Crown, User, UploadCloud, Loader2, TrendingUp, BrainCircuit, Activity } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { api } from './api';
@@ -26,6 +26,7 @@ import AccountFormModal from './components/AccountFormModal';
 import TodoView from './components/TodoView';
 import ShareTradeModal from './components/ShareTradeModal';
 import SimulatorView from './components/SimulatorView';
+import LegalDocs from './components/LegalDocs';
 
 // CONSTANTES
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
@@ -74,6 +75,75 @@ function App() {
     const [authInitialState, setAuthInitialState] = useState(false);
     const colors = (user?.colors) ? user.colors : DEFAULT_COLORS;
 
+    // --- AJOUTS POUR LE RAFRAÎCHISSEMENT AUTO ---
+    // Pour comparer l'ancien grade et le nouveau
+    const prevProStatusRef = useRef(0);
+
+    // --- FONCTION DE RAFRAÎCHISSEMENT DU PROFIL ---
+    const refreshUserProfile = async (showNotif = false) => {
+        try {
+            // Sécurité : on vérifie si la méthode existe (dépend de ta modif api.js)
+            if (typeof api.getMe !== 'function') return;
+
+            const freshUser = await api.getMe();
+
+            // Si le grade a changé
+            if (prevProStatusRef.current !== freshUser.is_pro) {
+                const isUpgrade = freshUser.is_pro > prevProStatusRef.current;
+
+                // Mise à jour de l'utilisateur
+                setUser(freshUser);
+                api.setUser(freshUser); // Sauvegarde localStorage
+                prevProStatusRef.current = freshUser.is_pro;
+
+                // Notification visuelle "Système"
+                if (showNotif) {
+                    setSystemAlert({
+                        id: Date.now(),
+                        type: 'GRADE',
+                        message: isUpgrade
+                            ? "Félicitations ! Votre grade PRO a été activé. Profitez de toutes les fonctionnalités."
+                            : "Votre abonnement a expiré. Vous êtes repassé au grade Free."
+                    });
+                }
+            }
+        } catch (e) {
+            // Ignorer les erreurs silencieuses (ex: pas de connexion)
+            // console.error("Erreur refresh profile", e);
+        }
+    };
+
+    // --- GESTION DU RETOUR STRIPE (PAIEMENT SUCCÈS) ---
+    useEffect(() => {
+        const query = new URLSearchParams(window.location.search);
+
+        if (query.get('payment') === 'success') {
+            // Nettoyage de l'URL pour que ce soit propre
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // On attend 2 secondes que le Webhook Stripe ait le temps de taper la DB
+            setTimeout(() => {
+                refreshUserProfile(true);
+            }, 2000);
+        }
+    }, []);
+
+    // --- POLLING (VÉRIFICATION AUTOMATIQUE) ---
+    // Vérifie toutes les 60 secondes si le grade est toujours valide
+    useEffect(() => {
+        if (!user) return;
+
+        // Sync initiale de la ref
+        prevProStatusRef.current = user.is_pro || 0;
+
+        const interval = setInterval(() => {
+            refreshUserProfile(true);
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, [user]); // Dépendance user pour relancer si user change (ex: login)
+
+
     // --- INIT ---
     useEffect(() => {
         const root = document.documentElement;
@@ -88,6 +158,9 @@ function App() {
         const token = api.getToken();
         if (savedUser && token) {
             setUser(savedUser);
+            // Init de la ref au chargement
+            prevProStatusRef.current = savedUser.is_pro || 0;
+
             if (savedUser.preferences?.defaultView) setActiveTab(savedUser.preferences.defaultView);
             setViewMode('app');
             loadAccounts();
@@ -276,7 +349,7 @@ function App() {
     // --- GESTION NAVIGATION ET ACCES ---
     const handleNavClick = (tab) => {
         // Liste des onglets accessibles aux utilisateurs gratuits
-        const freeTabs = ['journal', 'calculator', 'settings', 'updates', 'routine'];
+        const freeTabs = ['journal', 'calculator', 'settings', 'updates', 'routine', 'legal'];
 
         if (tab === 'updates') {
             setHasNewUpdates(false);
@@ -381,6 +454,12 @@ function App() {
                                             colors={colors}
                                         />
                                     }
+                                </div>
+                            )}
+
+                            {activeTab === 'legal' && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <LegalDocs onClose={() => setActiveTab('settings')} />
                                 </div>
                             )}
 

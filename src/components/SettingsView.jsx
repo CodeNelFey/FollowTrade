@@ -10,15 +10,43 @@ const CURRENCIES = [
 
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
 
-const PLANS = [
-    { id: 0, name: 'Free', icon: User, color: 'bg-gray-500', price: 'Gratuit', features: ['Journal de base', 'Publicités'], disabled: false },
-    { id: 1, name: 'PRO', icon: Crown, color: 'bg-amber-500', price: 'Bientôt disponible', features: ['Couleurs perso', 'Zéro Pubs', 'Support Prio'], disabled: true, badge: 'Bientôt' },
-    { id: 2, name: 'VIP', icon: Sparkles, color: 'bg-emerald-500', price: 'Sur demande', features: ['Accès Calendrier', 'Analyses Graphiques', 'Thèmes & Couleurs'], disabled: false, action: 'TELEGRAM' },
-];
-
+// --- CONFIG STRIPE ---
+const STRIPE_PRICE_PRO = import.meta.env.VITE_STRIPE_PRICE_PRO;
 const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
     const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
-    const TELEGRAM_LINK = "https://t.me/Sohan_Birotheau";
+
+    // --- PLANS MIS A JOUR ---
+    const PLANS = [
+        {
+            id: 0,
+            name: 'Free',
+            icon: User,
+            color: 'bg-gray-500',
+            price: 'Gratuit',
+            features: ['Journal de base', 'Publicités'],
+            disabled: false
+        },
+        {
+            id: 1,
+            name: 'PRO',
+            icon: Crown,
+            color: 'bg-amber-500',
+            price: '9.99€ / mois',
+            features: ['Couleurs perso', 'Zéro Pubs', 'Support Prio'],
+            disabled: false,
+            action: 'STRIPE' // Active le paiement
+        },
+        {
+            id: 2,
+            name: 'VIP',
+            icon: Sparkles,
+            color: 'bg-emerald-500',
+            price: 'Réservé',
+            features: ['Accès Calendrier', 'Analyses Graphiques', 'Thèmes & Couleurs'],
+            disabled: true, // Verrouillé
+            badge: 'Privé'
+        },
+    ];
 
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', email: '', password: '', confirmPassword: '',
@@ -31,8 +59,6 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
     const [message, setMessage] = useState(null);
     const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
-
-    // État pour le scroll
     const [isScrolled, setIsScrolled] = useState(false);
 
     const fileInputRef = useRef(null);
@@ -50,14 +76,11 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         }
     }, [user]);
 
-    // DÉTECTION DU SCROLL (Pour l'effet de flou)
     useEffect(() => {
         const handleScroll = (e) => {
-            // On utilise window ou l'élément cible selon le cas, ici on capture tout
             const scrollTop = window.scrollY || e.target.scrollTop || 0;
-            setIsScrolled(scrollTop > 20); // Se déclenche après 20px de descente
+            setIsScrolled(scrollTop > 20);
         };
-        // 'true' active la capture, utile si c'est une div interne qui scroll
         window.addEventListener('scroll', handleScroll, true);
         return () => window.removeEventListener('scroll', handleScroll, true);
     }, []);
@@ -82,9 +105,25 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         markAsDirty();
     };
 
-    const handlePlanClick = (plan) => {
-        if (plan.disabled) return;
-        if (plan.action === 'TELEGRAM') { window.open(TELEGRAM_LINK, '_blank'); return; }
+    // --- GESTION DU CLIC SUR UN PLAN (STRIPE) ---
+    const handlePlanClick = async (plan) => {
+        if (plan.disabled || user.is_pro >= plan.id) return;
+
+        if (plan.action === 'STRIPE') {
+            setIsLoading(true);
+            try {
+                // Appel API pour créer la session Stripe
+                const response = await api.createCheckoutSession(STRIPE_PRICE_PRO, 'PRO');
+                if (response.url) {
+                    window.location.href = response.url; // Redirection
+                }
+            } catch (error) {
+                setMessage({ type: 'error', text: "Erreur initialisation paiement" });
+                console.error(error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
     };
 
     const handleFileChange = async (e) => {
@@ -144,10 +183,9 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
     return (
         <div className="max-w-3xl mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
 
-            {/* --- HEADER STICKY (CORRIGÉ) --- */}
+            {/* --- HEADER STICKY --- */}
             <div className={`
                 z-40 flex items-center justify-between mb-8
-                /* CORRECTION ICI : On utilise -top-4 (mobile) et -top-8 (pc) pour compenser les marges négatives */
                 -top-4 -mt-4 -mx-4 px-4 py-4 
                 md:-top-8 md:-mt-8 md:-mx-8 md:px-8 md:py-6
                 transition-all duration-300 ease-in-out
@@ -227,23 +265,26 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
                             );
                         })}
                     </div>
-                    {user?.is_pro === 7 && <div className="mt-4 text-center"><button type="button" onClick={() => setFormData(prev => ({...prev, is_pro: 7}))} className="text-xs text-purple-500 font-bold hover:underline opacity-50 hover:opacity-100">Restaurer Grade Admin</button></div>}
                 </section>
 
-                <div className="pt-6 mt-8 border-t border-gray-200 dark:border-neutral-800 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <button type="button" onClick={onLogout} className="flex items-center gap-2 text-red-500 hover:text-red-600 font-bold text-sm px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors"><LogOut size={18} /> Déconnexion</button>
-                    {user?.is_pro === 7 && <button type="button" onClick={() => onNavigate('admin')} className="flex items-center gap-2 text-purple-500 hover:text-purple-600 font-bold text-sm px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/10 rounded-xl transition-colors"><ShieldAlert size={18} /> Admin Panel</button>}
+                <div className="pt-6 mt-8 border-t border-gray-200 dark:border-neutral-800">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <button type="button" onClick={() => onNavigate('legal')} className="flex items-center gap-2 text-gray-500 hover:text-indigo-500 font-bold text-sm px-4 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800 rounded-xl transition-colors"><ShieldAlert size={18} /> Mentions Légales & CGV</button>
+                        <div className="flex items-center gap-4">
+                            {user?.is_pro === 7 && <button type="button" onClick={() => onNavigate('admin')} className="flex items-center gap-2 text-purple-500 hover:text-purple-600 font-bold text-sm px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-900/10 rounded-xl transition-colors"><ShieldAlert size={18} /> Admin Panel</button>}
+                            <button type="button" onClick={onLogout} className="flex items-center gap-2 text-red-500 hover:text-red-600 font-bold text-sm px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-colors"><LogOut size={18} /> Déconnexion</button>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 text-center mt-6">Conformément au RGPD, vous pouvez télécharger ou supprimer vos données. Contactez le support pour une suppression définitive.</p>
                 </div>
-
             </form>
 
-            {/* --- BOUTON DE SAUVEGARDE FLOTTANT (FAB) --- */}
+            {/* --- BOUTON DE SAUVEGARDE FLOTTANT --- */}
             <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 transform ${isDirty ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
                 <button onClick={handleSubmit} disabled={isLoading} className="flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-4 rounded-full font-bold shadow-2xl shadow-indigo-500/40 hover:shadow-indigo-500/60 active:scale-95 transition-all animate-in zoom-in-95 duration-200">
                     {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={20} />}<span>Enregistrer les modifications</span>
                 </button>
             </div>
-
         </div>
     );
 };
