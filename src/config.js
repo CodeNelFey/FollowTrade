@@ -6,7 +6,7 @@ const isProduction = import.meta.env.PROD;
 export const config = {
     // 1. L'URL de ton Backend
     // En prod c'est vide (car même domaine), en dev c'est localhost
-    API_URL: isProduction ? '' : 'http://localhost:3000',
+    API_URL: '',
 
     // 2. Tes IDs Stripe
     STRIPE: {
