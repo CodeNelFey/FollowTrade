@@ -122,10 +122,16 @@ const authenticateToken = (req, res, next) => {
 app.post('/api/create-checkout-session', authenticateToken, async (req, res) => {
     const { priceId, planType } = req.body;
     try {
-        const origin = req.headers.origin || 'http://localhost:5173'; // Fallback Dev
+        const origin = req.headers.origin || 'http://localhost:5173';
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'subscription',
+
+            // --- AJOUTE CETTE LIGNE ---
+            customer_email: req.user.email,
+            // --------------------------
+
             line_items: [{ price: priceId, quantity: 1 }],
             allow_promotion_codes: true,
             metadata: { userId: req.user.id, planType: planType },
@@ -142,46 +148,61 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
 
 app.post('/api/cancel-subscription', authenticateToken, async (req, res) => {
     try {
+        const userId = req.user.id;
         const userEmail = req.user.email;
-        console.log(`🔍 Recherche abonnement pour : ${userEmail}`);
-
-        // 1. On récupère TOUS les clients Stripe avec cet email (pas juste le premier)
-        const customers = await stripe.customers.list({ email: userEmail, limit: 10 });
+        console.log(`🔍 Tentative résiliation pour User ID: ${userId} (Email App: ${userEmail})`);
 
         let subscriptionCancelled = false;
+        let customersToCheck = [];
 
-        // 2. On parcourt chaque client trouvé pour voir s'il a un abonnement actif
-        for (const customer of customers.data) {
+        // STRATÉGIE 1 : Recherche par METADATA (C'est ça qui contourne le problème Apple Pay)
+        // On demande à Stripe : "Qui a le userId = X ?"
+        const searchByMeta = await stripe.customers.search({
+            query: `metadata['userId']:'${userId}'`,
+            limit: 10
+        });
+        customersToCheck = [...searchByMeta.data];
+
+        // STRATÉGIE 2 : Recherche par EMAIL (Au cas où, pour les anciens clients)
+        if (customersToCheck.length === 0) {
+            console.log("⚠️ Pas trouvé par ID, tentative par email...");
+            const searchByEmail = await stripe.customers.list({ email: userEmail, limit: 10 });
+            customersToCheck = [...searchByEmail.data];
+        }
+
+        console.log(`🔎 ${customersToCheck.length} comptes Stripe potentiels trouvés.`);
+
+        // On parcourt tous les comptes trouvés pour couper l'abonnement actif
+        for (const customer of customersToCheck) {
             const subscriptions = await stripe.subscriptions.list({
                 customer: customer.id,
                 status: 'active'
             });
 
-            // Si on trouve un abonnement actif, BINGO, on le coupe
             if (subscriptions.data.length > 0) {
                 const subId = subscriptions.data[0].id;
-                console.log(`✅ Abonnement trouvé (${subId}) sur le client ${customer.id}. Annulation...`);
+                console.log(`✅ Abonnement ACTIF trouvé (${subId}) sur le client Stripe ${customer.id}. Annulation...`);
 
                 await stripe.subscriptions.cancel(subId);
                 subscriptionCancelled = true;
-                break; // On arrête de chercher, c'est fait
+                // On continue la boucle au cas où il aurait payé 2 fois par erreur, on nettoie tout.
             }
         }
 
-        if (!subscriptionCancelled) {
-            console.log("⚠️ Aucun abonnement actif trouvé chez Stripe pour cet email.");
-        }
-
-        // 3. Quoi qu'il arrive, on repasse l'utilisateur en FREE localement
-        db.run("UPDATE users SET is_pro = 0 WHERE id = ?", [req.user.id], () => {
-            res.json({
-                message: subscriptionCancelled ? "Résilié avec succès." : "Compte passé en Free (mais aucun abonnement Stripe trouvé).",
-                found: subscriptionCancelled
-            });
+        // Mise à jour locale
+        db.run("UPDATE users SET is_pro = 0 WHERE id = ?", [userId], () => {
+            if (subscriptionCancelled) {
+                res.json({ message: "Abonnement résilié avec succès (trouvé via Stripe)." });
+            } else {
+                // Cas où l'user est marqué PRO chez toi, mais Stripe ne trouve rien d'actif
+                // On le repasse quand même en Free pour corriger ta base de données.
+                console.log("⚠️ Aucun abonnement actif trouvé chez Stripe, mais compte passé en FREE localement.");
+                res.json({ message: "Compte repassé en Free (Abonnement introuvable ou déjà terminé)." });
+            }
         });
 
     } catch (error) {
-        console.error("🚨 Erreur annulation:", error);
+        console.error("🚨 Erreur technique résiliation:", error);
         res.status(500).json({ error: "Erreur technique lors de la résiliation." });
     }
 });
