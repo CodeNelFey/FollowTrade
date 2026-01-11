@@ -165,11 +165,9 @@ app.post('/api/register', async (req, res) => {
     db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, existing) => {
         if (existing) {
             if (existing.is_verified === 1) return res.status(400).json({ error: "Email déjà utilisé." });
-            // Renvoyer le code
             db.run(`UPDATE users SET password=?, first_name=?, last_name=?, verification_code=? WHERE id=?`,
                 [hashedPassword, first_name, last_name, code, existing.id], () => sendVerifEmail(email, code, res));
         } else {
-            // Créer nouveau
             db.run(`INSERT INTO users (email, password, first_name, last_name, verification_code, is_verified, is_pro) VALUES (?, ?, ?, ?, ?, 0, 0)`,
                 [email, hashedPassword, first_name, last_name, code], () => sendVerifEmail(email, code, res));
         }
@@ -197,7 +195,6 @@ app.post('/api/verify-email', (req, res) => {
         if (String(user.verification_code) !== String(code)) return res.status(400).json({ error: "Code incorrect" });
 
         db.run("UPDATE users SET is_verified = 1, verification_code = NULL WHERE id = ?", [user.id], () => {
-            // Email bienvenue optionnel
             transporter.sendMail({ from: process.env.EMAIL_USER, to: email, subject: "Bienvenue !", html: getWelcomeTemplate(user.first_name) }).catch(()=>{});
             const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: '24h' });
             res.json({ token, user: { ...user, password: '' } });
@@ -287,7 +284,14 @@ app.put('/api/todo-lists/:id', authenticateToken, (req, res) => {
     db.run(`UPDATE todo_lists SET title=?, icon=?, color=?, frequency=? WHERE id=? AND user_id=?`,
         [title, icon, color, frequency, req.params.id, req.user.id], () => res.json({ id: req.params.id, ...req.body }));
 });
-
+app.put('/api/todo-lists/reorder', authenticateToken, (req, res) => {
+    const { lists } = req.body;
+    db.serialize(() => {
+        const stmt = db.prepare(`UPDATE todo_lists SET position = ? WHERE id = ? AND user_id = ?`);
+        lists.forEach((item, index) => stmt.run(index, item.id, req.user.id));
+        stmt.finalize(() => res.json({ message: "Reordered" }));
+    });
+});
 app.delete('/api/todo-lists/:id', authenticateToken, (req, res) => {
     db.run(`DELETE FROM todos WHERE list_id = ?`, [req.params.id], () => {
         db.run(`DELETE FROM todo_lists WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id], () => res.json({ message: "Deleted" }));
@@ -312,7 +316,6 @@ app.post('/api/todos', authenticateToken, (req, res) => {
             });
     }
 });
-
 app.put('/api/todos/:id', authenticateToken, (req, res) => {
     const { is_completed } = req.body;
     db.run(`UPDATE todos SET is_completed = ? WHERE id = ?`, [is_completed, req.params.id], () => res.json({ message: "Updated" }));
@@ -321,7 +324,7 @@ app.delete('/api/todos/:id', authenticateToken, (req, res) => {
     db.run(`DELETE FROM todos WHERE id = ?`, [req.params.id], () => res.json({ message: "Deleted" }));
 });
 
-// --- ACCOUNTS (Full CRUD) ---
+// --- ACCOUNTS ---
 app.get('/api/accounts', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM accounts WHERE user_id = ?`, [req.user.id], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -356,7 +359,7 @@ app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
     });
 });
 
-// --- TRADES (Full CRUD) ---
+// --- TRADES ---
 app.get('/api/trades', authenticateToken, (req, res) => {
     const sql = req.query.accountId
         ? `SELECT * FROM trades WHERE user_id=? AND account_id=? ORDER BY date DESC`
@@ -398,7 +401,7 @@ app.delete('/api/trades/:id', authenticateToken, (req, res) => {
     db.run(`DELETE FROM trades WHERE id=? AND user_id=?`, [req.params.id, req.user.id], () => res.json({ message: "Trade supprimé" }));
 });
 
-// --- ADMIN / NOTIFS / UPDATES ---
+// --- ADMIN & MISC ---
 app.get('/api/admin/health', authenticateToken, async (req, res) => {
     db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], async (err, u) => {
         if (u?.is_pro !== 7) return res.sendStatus(403);
@@ -417,9 +420,60 @@ app.get('/api/admin/table/:name', authenticateToken, (req, res) => {
         db.all(`SELECT * FROM ${req.params.name} ORDER BY id DESC LIMIT 50`, [], (e, r) => res.json(r));
     });
 });
-app.get('/api/notifications', authenticateToken, (req, res) => db.all(`SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC`, [req.user.id], (e, r) => res.json(r)));
-app.put('/api/notifications/read', authenticateToken, (req, res) => db.run(`UPDATE notifications SET is_read=1 WHERE user_id=?`, [req.user.id], () => res.json({ message: "OK" })));
-app.get('/api/updates', authenticateToken, (req, res) => db.all(`SELECT * FROM updates ORDER BY date DESC`, [], (e, r) => res.json(r)));
+app.get('/api/admin/users', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        db.all("SELECT * FROM users ORDER BY id DESC", [], (err, rows) => res.json(rows));
+    });
+});
+app.put('/api/admin/users/:id', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        const { is_pro, is_verified } = req.body;
+        db.run("UPDATE users SET is_pro = ?, is_verified = ? WHERE id = ?", [is_pro, is_verified, req.params.id], () => res.json({ message: "Updated" }));
+    });
+});
+app.delete('/api/admin/users/:id', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        db.run("DELETE FROM users WHERE id = ?", [req.params.id], () => res.json({ message: "Supprimé" }));
+    });
+});
+app.post('/api/admin/updates', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        const { title, content, type } = req.body;
+        const date = new Date().toISOString();
+        db.run("INSERT INTO updates (title, content, type, date) VALUES (?, ?, ?, ?)", [title, content, type, date], function() {
+            res.json({ id: this.lastID, ...req.body, date });
+        });
+    });
+});
+app.put('/api/admin/updates/:id', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        const { title, content, type } = req.body;
+        db.run("UPDATE updates SET title=?, content=?, type=? WHERE id=?", [title, content, type, req.params.id], () => res.json({ message: "Updated" }));
+    });
+});
+app.delete('/api/admin/updates/:id', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        db.run("DELETE FROM updates WHERE id=?", [req.params.id], () => res.json({ message: "Deleted" }));
+    });
+});
+app.post('/api/admin/test-email', authenticateToken, (req, res) => {
+    db.get("SELECT is_pro FROM users WHERE id=?", [req.user.id], async (err, u) => {
+        if (u?.is_pro !== 7) return res.sendStatus(403);
+        try {
+            await transporter.sendMail({ from: process.env.EMAIL_USER, to: req.user.email, subject: "Test Email Admin", text: "Si vous recevez ceci, l'envoi d'email fonctionne." });
+            res.json({ message: "Email envoyé" });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+});
+app.get('/api/notifications', authenticateToken, (req, res) => db.all("SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC", [req.user.id], (e, r) => res.json(r || [])));
+app.put('/api/notifications/read', authenticateToken, (req, res) => db.run("UPDATE notifications SET is_read=1 WHERE user_id=?", [req.user.id], () => res.json({ message: "Read" })));
+app.get('/api/updates', authenticateToken, (req, res) => db.all("SELECT * FROM updates ORDER BY date DESC", [], (e, r) => res.json(r || [])));
 
 // ==================================================================
 // 4. SERVIR LE SITE (PRODUCTION) - A LA FIN
