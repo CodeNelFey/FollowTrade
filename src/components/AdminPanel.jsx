@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Search, Trash2, Edit2, ShieldAlert, User, Crown, Sparkles, X, Plus, Mail, Send, Lock, Activity, Loader2 } from 'lucide-react';
+import {config} from "../config.js";
 
 const AdminPanel = () => {
     // URL backend (dynamique selon prod/dev)
-    const API_URL = import.meta.env.MODE === 'production' ? '' : 'http://localhost:3000';
+    export const BASE_URL = config.API_URL;
+    const API_URL = `${BASE_URL}:3000`;
 
     const [activeTab, setActiveTab] = useState('users');
 
