@@ -479,7 +479,7 @@ app.get('/api/updates', authenticateToken, (req, res) => db.all("SELECT * FROM u
 // 4. SERVIR LE SITE (PRODUCTION) - A LA FIN
 // ==================================================================
 app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (req, res) => {
+app.get('/.*/', (req, res) => {
     if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     } else {
