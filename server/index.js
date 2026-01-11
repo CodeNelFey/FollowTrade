@@ -140,6 +140,40 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
     }
 });
 
+app.post('/api/cancel-subscription', authenticateToken, async (req, res) => {
+    try {
+        const userEmail = req.user.email;
+
+        // 1. On cherche le client Stripe avec cet email
+        const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
+
+        if (customers.data.length > 0) {
+            const customerId = customers.data[0].id;
+
+            // 2. On cherche son abonnement actif
+            const subscriptions = await stripe.subscriptions.list({
+                customer: customerId,
+                status: 'active',
+                limit: 1
+            });
+
+            if (subscriptions.data.length > 0) {
+                // 3. On annule l'abonnement chez Stripe
+                await stripe.subscriptions.cancel(subscriptions.data[0].id);
+            }
+        }
+
+        // 4. Quoi qu'il arrive (même si pas trouvé chez Stripe), on repasse l'user en FREE localement
+        db.run("UPDATE users SET is_pro = 0 WHERE id = ?", [req.user.id], () => {
+            res.json({ message: "Abonnement résilié avec succès." });
+        });
+
+    } catch (error) {
+        console.error("Erreur annulation:", error);
+        res.status(500).json({ error: "Erreur lors de la résiliation." });
+    }
+});
+
 // --- AUTH ---
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;

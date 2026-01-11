@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Lock, Mail, Save, AlertTriangle, Sliders, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut, ShieldAlert, PaintBucket, RotateCcw, Crown, Sparkles, CheckSquare, CreditCard, ExternalLink } from 'lucide-react';
 import { api } from '../api';
-import { config } from '../config'; // On importe le fichier
+import { config } from '../config';
 
 const CURRENCIES = [
     { code: 'USD', name: 'US Dollar', icon: DollarSign },
@@ -13,10 +13,11 @@ const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', wi
 
 // --- CONFIG STRIPE ---
 const STRIPE_PRICE_PRO = config.STRIPE.PRO_PLAN_ID;
-const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
-    const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
 
-    // --- PLANS MIS A JOUR ---
+const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
+    const BASE_URL = config.API_URL || '';
+
+    // --- PLANS (Configuration) ---
     const PLANS = [
         {
             id: 0,
@@ -106,8 +107,29 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
         markAsDirty();
     };
 
-    // --- GESTION DU CLIC SUR UN PLAN (STRIPE) ---
+    // --- GESTION DU CLIC SUR UN PLAN (STRIPE & RESILIATION) ---
     const handlePlanClick = async (plan) => {
+        // CAS 1 : RÉSILIATION (Je suis PRO et je clique sur FREE)
+        if (user.is_pro === 1 && plan.id === 0) {
+            if (window.confirm("Voulez-vous vraiment résilier votre abonnement PRO et repasser en version Gratuite ?")) {
+                setIsLoading(true);
+                try {
+                    await api.cancelSubscription();
+                    // Mise à jour immédiate de l'interface
+                    const updatedUser = { ...user, is_pro: 0 };
+                    onUpdateUser(updatedUser);
+                    setFormData(prev => ({ ...prev, is_pro: 0 })); // Update local state too
+                    setMessage({ type: 'success', text: "Abonnement résilié. Retour au plan Gratuit." });
+                } catch (e) {
+                    setMessage({ type: 'error', text: "Erreur lors de la résiliation." });
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+            return;
+        }
+
+        // CAS 2 : UPGRADE (Normal)
         if (plan.disabled || user.is_pro >= plan.id) return;
 
         if (plan.action === 'STRIPE') {
@@ -166,7 +188,7 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
     const currentCurrency = CURRENCIES.find(c => c.code === formData.currency) || CURRENCIES[0];
     const CurrencyIcon = currentCurrency.icon;
     let displayAvatar = null;
-    if (avatarUrl) displayAvatar = (avatarUrl.startsWith('blob:') || avatarUrl.startsWith('http')) ? avatarUrl : `${BASE_URL}${avatarUrl}`;
+    if (avatarUrl) displayAvatar = api.getAvatarUrl(avatarUrl);
 
     const renderColorInput = (label, key) => (
         <div className={colorInputWrapper}>
@@ -261,7 +283,14 @@ const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => 
                                     {isCurrent && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md">ACTUEL</div>}
                                     {plan.badge && !isCurrent && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-md">{plan.badge}</div>}
                                     <div><div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${plan.id === 0 ? 'bg-gray-100 text-gray-500' : (plan.id === 1 ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600')}`}><Icon size={20} /></div><h4 className="text-lg font-black text-gray-900 dark:text-white mb-1">{plan.name}</h4><p className="text-xs font-bold text-gray-400 mb-4">{plan.price}</p><ul className="space-y-2 mb-4">{plan.features.map((f, i) => (<li key={i} className="flex items-center gap-2 text-[10px] font-bold text-gray-500 dark:text-gray-400"><CheckSquare size={12} className="text-indigo-500" /> {f}</li>))}</ul></div>
-                                    <div className={`w-full py-2 rounded-xl text-center text-xs font-bold transition-colors flex items-center justify-center gap-2 ${isCurrent ? 'bg-indigo-600 text-white' : ''} ${!isCurrent && !plan.disabled ? 'bg-gray-100 dark:bg-neutral-800 text-gray-500 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 group-hover:text-indigo-600' : ''} ${plan.disabled && !isCurrent ? 'bg-gray-100 dark:bg-neutral-800 text-gray-300' : ''}`}>{isCurrent ? 'Plan Actif' : (plan.disabled ? 'Indisponible' : (plan.action === 'TELEGRAM' ? <><ExternalLink size={12}/> Contacter</> : 'Choisir'))}</div>
+                                    <div className={`w-full py-2 rounded-xl text-center text-xs font-bold transition-colors flex items-center justify-center gap-2 ${isCurrent ? 'bg-indigo-600 text-white' : ''} ${!isCurrent && !plan.disabled ? 'bg-gray-100 dark:bg-neutral-800 text-gray-500 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 group-hover:text-indigo-600' : ''} ${plan.disabled && !isCurrent ? 'bg-gray-100 dark:bg-neutral-800 text-gray-300' : ''}`}>
+                                        {
+                                            isCurrent ? 'Plan Actif' :
+                                                (plan.id === 0 && user.is_pro === 1 ? 'Résilier' :
+                                                    (plan.disabled ? 'Indisponible' :
+                                                        (plan.action === 'TELEGRAM' ? <><ExternalLink size={12}/> Contacter</> : 'Choisir')))
+                                        }
+                                    </div>
                                 </div>
                             );
                         })}

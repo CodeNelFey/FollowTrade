@@ -101,6 +101,8 @@ export const api = {
         body: JSON.stringify({ priceId, planType })
     }),
 
+    cancelSubscription: () => request('/cancel-subscription', { method: 'POST' }),
+
     // --- ADMIN PANEL ---
     adminCheckHealth: () => request('/admin/health'),
     adminGetTableData: (tableName) => request(`/admin/table/${tableName}`),
