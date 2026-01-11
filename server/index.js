@@ -18,7 +18,7 @@ const SECRET_KEY = process.env.SECRET_KEY || "super_secret_cle";
 // ==================================================================
 // 1. WEBHOOK STRIPE (OBLIGATOIREMENT AVANT express.json)
 // ==================================================================
-app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
