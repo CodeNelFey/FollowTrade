@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Lock, Mail, Save, AlertTriangle, Sliders, Eye, Layout, CheckCircle, ChevronDown, Check, DollarSign, Euro, PoundSterling, ArrowLeft, Camera, LogOut, ShieldAlert, PaintBucket, RotateCcw, Crown, Sparkles, CheckSquare, CreditCard, ExternalLink } from 'lucide-react';
 import { api } from '../api';
+import { config } from '../config'; // On importe le fichier
 
 const CURRENCIES = [
     { code: 'USD', name: 'US Dollar', icon: DollarSign },
@@ -11,7 +12,7 @@ const CURRENCIES = [
 const DEFAULT_COLORS = { balance: '#4f46e5', buy: '#2563eb', sell: '#ea580c', win: '#10b981', loss: '#f43f5e' };
 
 // --- CONFIG STRIPE ---
-const STRIPE_PRICE_PRO = import.meta.env.VITE_STRIPE_PRICE_PRO;
+const STRIPE_PRICE_PRO = config.STRIPE.PRO_PLAN_ID;
 const SettingsView = ({ user, onUpdateUser, onClose, onLogout, onNavigate }) => {
     const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { X, Sparkles, CheckCircle2, User, Crown, Loader2, ArrowRight, Lock } from 'lucide-react';
 import { api } from '../api';
+import {config} from "../config.js";
 
 // ⚠️ Assure-toi que c'est le bon ID de prix Stripe (commençant par price_...)
-const STRIPE_PRICE_PRO = import.meta.env.VITE_STRIPE_PRICE_PRO;
+const STRIPE_PRICE_PRO = config.STRIPE.PRO_PLAN_ID;
 const UpgradeModal = ({ isOpen, onClose }) => {
     const [isLoading, setIsLoading] = useState(false);
 
