@@ -125,7 +125,7 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
         const origin = req.headers.origin || 'http://localhost:5173';
 
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
+            automatic_payment_methods: { enabled: true },
             mode: 'subscription',
 
             // --- AJOUTE CETTE LIGNE ---
